@@ -1,1 +1,5 @@
-(js/packages.js is just a source file, no build artifacts, dependencies, or temp files in the changes)
+(js/packages.js is a source file, so no need to add anything to .gitignore)
+
+```javascript
+
+```
