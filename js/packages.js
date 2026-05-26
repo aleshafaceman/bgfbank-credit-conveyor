@@ -212,7 +212,6 @@ function selectOfferPackage(id) {
     syncStateFromSelectedPackage();
     renderPackageCards();
     updateResultCards();
-    updatePackageExtrasUI();
 }
 
 function togglePackageExtra(key, checked) {
@@ -267,7 +266,6 @@ function togglePackageExtrasPanel() {
     if (!panel) return;
     panel.classList.toggle('hidden');
     if (icon) icon.className = panel.classList.contains('hidden') ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
-    if (!panel.classList.contains('hidden')) updatePackageExtrasUI();
 }
 
 function openComparePackagesModal() {
