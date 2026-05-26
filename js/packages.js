@@ -212,7 +212,6 @@ function selectOfferPackage(id) {
     syncStateFromSelectedPackage();
     renderPackageCards();
     updateResultCards();
-    updatePackageExtrasUI();
 }
 
 function togglePackageExtra(key, checked) {
