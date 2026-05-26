@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>БЖФ Банк · Менеджер заявок</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="css/manager.css">
+    <link rel="stylesheet" href="css/scoring.css">
+</head>
+<body>
+
+<!-- ЭКРАН АВТОРИЗАЦИИ -->
+<div id="authScreen" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#f0f4f8;z-index:3000;display:flex;align-items:center;justify-content:center;">
+    <div style="background:white;border-radius:24px;padding:40px 32px;width:380px;box-shadow:0 12px 30px rgba(0,0,0,0.1);text-align:center;">
+        <div style="font-size:32px;font-weight:900;color:#003b6f;margin-bottom:8px;">БЖФ</div>
+        <h2 style="font-size:22px;color:#003b6f;margin-bottom:4px;">Панель менеджера</h2>
+        <p style="font-size:13px;color:#7e9bb6;margin-bottom:28px;">Введите логин и пароль</p>
+        <input type="text" id="loginInput" placeholder="Логин" value="admin" style="width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;text-align:center;margin-bottom:12px;">
+        <input type="password" id="passInput" placeholder="Пароль" value="manager123" style="width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;text-align:center;margin-bottom:12px;">
+        <div id="loginError" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none;"></div>
+        <button id="loginBtn" style="width:100%;padding:14px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;border:none;background:#003b6f;color:white;">Войти</button>
+        <p style="font-size:11px;color:#94a3b8;margin-top:16px;">admin / manager123</p>
+    </div>
+</div>
+
+<!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
+<div id="mainScreen" style="display:none;">
+    <div class="manager-layout">
+        <header class="m-header">
+            <div class="m-brand"><div class="m-logo">Б</div><div><div class="m-bank-name">БЖФ БАНК</div><div class="m-section-title">Панель менеджера</div></div></div>
+            <div class="m-stats">
+                <div class="m-stat-item"><i class="fas fa-file-signature"></i><span>Активных заявок: <b id="activeCount">0</b></span></div>
+                <div class="m-stat-item"><i class="fas fa-clock"></i><span>На рассмотрении: <b id="pendingCount">0</b></span></div>
+            </div>
+            <div class="m-user">
+                <div class="m-avatar">ЕС</div><div><div class="m-user-name">Елена Смирнова</div><div class="m-user-role">Кредитный менеджер</div></div>
+                <button class="m-logout" id="logoutBtn"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </header>
+
+        <div class="m-tabs">
+            <button class="m-tab active" id="tabApplications"><i class="fas fa-list-ul"></i> Все заявки</button>
+            <button class="m-tab" id="tabClients"><i class="fas fa-users"></i> Клиенты</button>
+            <button class="m-tab" id="tabChat"><i class="fas fa-comment-dots"></i> Чат с клиентами</button>
+            <button class="m-tab" id="tabReports"><i class="fas fa-chart-bar"></i> Отчёты</button>
+        </div>
+
+        <div class="m-content">
+            <div id="m-tab-applications">
+                <div class="m-applications-layout">
+                    <div class="m-app-list">
+                        <div class="m-list-header">
+                            <h3>Список заявок</h3>
+                            <div class="m-filter-row">
+                                <select id="filterStatus"><option value="all">Все статусы</option><option value="new">Новые</option><option value="processing">В обработке</option><option value="valuation">На оценке</option><option value="decision">Решение</option><option value="approved">Одобрено</option><option value="rejected">Отказ</option></select>
+                                <input type="text" id="filterSearch" placeholder="Поиск по № заявки или клиенту...">
+                            </div>
+                        </div>
+                        <div class="m-app-cards" id="mAppCards"></div>
+                    </div>
+                    <div class="m-app-detail" id="mAppDetail"><div class="m-detail-empty"><i class="fas fa-file-alt"></i><p>Выберите заявку для просмотра</p></div></div>
+                    <div class="m-app-detail hidden" id="mClientDetail"></div>
+                </div>
+            </div>
+            <div id="m-tab-clients" class="hidden"></div>
+            <div id="m-tab-chat" class="hidden"></div>
+            <div id="m-tab-reports" class="hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ОВЕРЛЕЙ СКОРИНГА -->
+<div class="scoring-overlay hidden" id="scoringOverlay">
+    <div class="scoring-panel">
+        <div class="scoring-left">
+            <h3><i class="fas fa-robot"></i> Скоринг заявки №4421-И</h3>
+            <p class="subtitle">Александр Кузнецов</p>
+            <div class="s-progress-track"><div class="s-progress-fill" id="sProgressFill"></div></div>
+            <div class="s-progress-label" id="sProgressLabel">0 из 8 шагов</div>
+            <div class="s-step-list" id="sStepList"></div>
+            <div class="s-detail-box">
+                <div style="font-weight:700;color:#003b6f;margin-bottom:4px;" id="sDetailTitle">Подготовка...</div>
+                <div id="sDetailContent">Запуск системы...</div>
+            </div>
+        </div>
+        <div class="scoring-right">
+            <h3><i class="fas fa-clipboard-check"></i> Результат</h3>
+            <p class="subtitle" id="sResultSubtitle">Ожидание запуска...</p>
+            <div class="s-issue-counters" id="sIssueCounters" style="display:none;">
+                <span class="warn-count" id="sWarnCount">⚠️ Предупреждений: 0</span>
+                <span class="err-count" id="sErrCount">❌ Ошибок: 0</span>
+            </div>
+            <div id="sResultArea">
+                <div style="text-align:center;padding:30px;color:#94a3b8;"><i class="fas fa-hourglass-half" style="font-size:32px;margin-bottom:8px;"></i><p style="font-size:12px;">Ожидание запуска...</p></div>
+            </div>
+            <div class="s-btn-row">
+                <button class="s-btn s-btn-primary" onclick="openManagerScoring()"><i class="fas fa-play"></i> Запустить скоринг</button>
+                <button class="s-btn s-btn-outline" onclick="closeManagerScoring()"><i class="fas fa-times"></i> Закрыть</button>
+            </div>
+        </div>
+        <div class="s-close"><button onclick="closeManagerScoring()">Закрыть панель скоринга</button></div>
+    </div>
+</div>
+
+<!-- МИНИ-МОДАЛКА ПРОБЛЕМЫ -->
+<div class="s-issue-modal hidden" id="sIssueModal">
+    <div class="s-issue-card" id="sIssueModalContent"></div>
+</div>
+
+<script>
+document.getElementById('loginBtn').addEventListener('click', function() {
+    var l = document.getElementById('loginInput').value.trim();
+    var p = document.getElementById('passInput').value;
+    var e = document.getElementById('loginError');
+    if (!l || !p) { e.style.display='block'; e.textContent='Введите логин и пароль'; return; }
+    if (l !== 'admin' || p !== 'manager123') { e.style.display='block'; e.textContent='Неверный логин или пароль'; return; }
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('mainScreen').style.display='block';
+    initApp();
+});
+document.getElementById('passInput').addEventListener('keydown', function(ev) { if (ev.key==='Enter') document.getElementById('loginBtn').click(); });
+document.getElementById('logoutBtn').addEventListener('click', function() {
+    if (confirm('Выйти из панели менеджера?')) {
+        document.getElementById('mainScreen').style.display='none';
+        document.getElementById('authScreen').style.display='flex';
+        document.getElementById('passInput').value='';
+        document.getElementById('loginError').style.display='none';
+    }
+});
+function initApp() {
+    setTimeout(function() {
+        if (typeof refreshData === 'function') refreshData();
+        if (typeof buildClients === 'function') buildClients();
+        if (typeof renderApplicationList === 'function') renderApplicationList();
+        if (typeof selectManagerApp === 'function') selectManagerApp('4421-И');
+        if (typeof updateStats === 'function') updateStats();
+        if (typeof bindEvents === 'function') bindEvents();
+    }, 300);
+}
+</script>
+
+
+
+<script src="../shared/data.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/navigation.js"></script>
+<script src="js/applications.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/client-card.js"></script>
+<script src="js/clients.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/scoring.js"></script>
+<script src="js/manager.js"></script>
+</body>
+</html>

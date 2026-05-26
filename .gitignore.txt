@@ -1,0 +1,18 @@
+# Системные файлы
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Временные файлы
+*.tmp
+*.bak
+*.log
+
+# Локальные настройки IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Не включать копии папок
+*maket — копия*
+*maket_new*
