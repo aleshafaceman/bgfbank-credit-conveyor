@@ -244,13 +244,20 @@ function updatePackageExtrasUI() {
     const pkg = (state.eligiblePackages || []).find(p => p.id === state.selectedPackageId);
     const isNoInsurance = pkg && pkg.id === 'PKG_NO_INSURANCE';
     
-    if (ltv) ltv.checked = isNoInsurance ? false : !!mods.ltvBoost;
-    if (cob) cob.checked = isNoInsurance ? false : !!mods.coBorrower;
+    if (ltv) {
+        ltv.checked = isNoInsurance ? false : !!mods.ltvBoost;
+        ltv.disabled = isNoInsurance;
+        // Блокируем родительский label
+        const ltvLabel = ltv.closest('.checkbox-label');
+        if (ltvLabel) ltvLabel.classList.toggle('checkbox-label--disabled', isNoInsurance);
+    }
+    if (cob) {
+        cob.checked = isNoInsurance ? false : !!mods.coBorrower;
+        cob.disabled = isNoInsurance;
+        const cobLabel = cob.closest('.checkbox-label');
+        if (cobLabel) cobLabel.classList.toggle('checkbox-label--disabled', isNoInsurance);
+    }
     if (fix) fix.checked = !!mods.fixedRate;
-    
-    // Блокируем недоступные опции визуально
-    if (ltv) ltv.disabled = isNoInsurance;
-    if (cob) cob.disabled = isNoInsurance;
 }
 
 function togglePackageExtrasPanel() {
