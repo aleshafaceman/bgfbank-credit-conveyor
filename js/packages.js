@@ -215,6 +215,20 @@ function selectOfferPackage(id) {
 }
 
 function togglePackageExtra(key, checked) {
+    // Проверка совместимости с пакетом «Без страхования»
+    const pkg = (state.eligiblePackages || []).find(p => p.id === state.selectedPackageId);
+    if (checked && pkg && pkg.id === 'PKG_NO_INSURANCE' && (key === 'ltvBoost' || key === 'coBorrower')) {
+        alert('Опция «' + (key === 'ltvBoost' ? 'Больше сумма (LTV Boost)' : 'Созаёмщик') + '» недоступна для пакета «Без страхования жизни».\n\nЭти опции требуют наличия комплексного страхования (ККС). Выберите пакет со страхованием.');
+        return; // Не применяем изменение
+    }
+    
+    // Проверка конфликта типов ставки
+    if (checked && key === 'fixedRate' && pkg && pkg.rateSubsequent) {
+        alert('Пакет «' + pkg.title + '» уже использует переменную ставку. Фиксированная ставка недоступна.');
+        return;
+    }
+    
+    // Старая логика
     state.packageModifiers = state.packageModifiers || {};
     state.packageModifiers[key] = checked;
     syncStateFromSelectedPackage();
@@ -227,9 +241,16 @@ function updatePackageExtrasUI() {
     const cob = document.getElementById('chkExtraCoBorrower');
     const fix = document.getElementById('chkExtraFixedRate');
     const mods = state.packageModifiers || {};
-    if (ltv) ltv.checked = !!mods.ltvBoost;
-    if (cob) cob.checked = !!mods.coBorrower;
+    const pkg = (state.eligiblePackages || []).find(p => p.id === state.selectedPackageId);
+    const isNoInsurance = pkg && pkg.id === 'PKG_NO_INSURANCE';
+    
+    if (ltv) ltv.checked = isNoInsurance ? false : !!mods.ltvBoost;
+    if (cob) cob.checked = isNoInsurance ? false : !!mods.coBorrower;
     if (fix) fix.checked = !!mods.fixedRate;
+    
+    // Блокируем недоступные опции визуально
+    if (ltv) ltv.disabled = isNoInsurance;
+    if (cob) cob.disabled = isNoInsurance;
 }
 
 function togglePackageExtrasPanel() {
