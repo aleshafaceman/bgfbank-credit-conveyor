@@ -132,6 +132,9 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22p
     pointer-events: none;
     cursor: not-allowed;
 }
+.checkbox-label--disabled input[type="checkbox"] {
+    pointer-events: none;
+}
 .btn-block { width: 100%; padding: 14px; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; border: none; transition: 0.2s; }
 .btn-block.primary { background: #003b6f; color: white; }
 .btn-block.primary:hover { background: #002d56; }

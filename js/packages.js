@@ -245,15 +245,24 @@ function updatePackageExtrasUI() {
     const isNoInsurance = pkg && pkg.id === 'PKG_NO_INSURANCE';
     
     if (ltv) {
-        ltv.checked = isNoInsurance ? false : !!mods.ltvBoost;
-        ltv.disabled = isNoInsurance;
-        // Блокируем родительский label
+        if (isNoInsurance) {
+            ltv.checked = false;
+            ltv.disabled = true;
+        } else {
+            ltv.disabled = false;
+            ltv.checked = !!mods.ltvBoost;
+        }
         const ltvLabel = ltv.closest('.checkbox-label');
         if (ltvLabel) ltvLabel.classList.toggle('checkbox-label--disabled', isNoInsurance);
     }
     if (cob) {
-        cob.checked = isNoInsurance ? false : !!mods.coBorrower;
-        cob.disabled = isNoInsurance;
+        if (isNoInsurance) {
+            cob.checked = false;
+            cob.disabled = true;
+        } else {
+            cob.disabled = false;
+            cob.checked = !!mods.coBorrower;
+        }
         const cobLabel = cob.closest('.checkbox-label');
         if (cobLabel) cobLabel.classList.toggle('checkbox-label--disabled', isNoInsurance);
     }
@@ -264,9 +273,25 @@ function togglePackageExtrasPanel() {
     const panel = document.getElementById('packageExtrasPanel');
     const icon = document.getElementById('packageExtrasChevron');
     if (!panel) return;
-    panel.classList.toggle('hidden');
-    if (icon) icon.className = panel.classList.contains('hidden') ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+    
+    const isHidden = panel.classList.toggle('hidden');
+    
+    if (icon) {
+        icon.className = isHidden ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+    }
+    
+    if (!isHidden) {
+        // Панель открылась — обновляем чекбоксы
+        updatePackageExtrasUI();
+    }
 }
+
+// Делегированный обработчик для кнопки «Дополнительно»
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.closest('.pkg-extras-toggle')) {
+        togglePackageExtrasPanel();
+    }
+});
 
 function openComparePackagesModal() {
     const tbody = document.getElementById('comparePackagesBody');
