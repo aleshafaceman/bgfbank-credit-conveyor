@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>БЖФ Банк · Прескоринг (менеджер)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background: #f0f4f8; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        
+        .container { width: 100%; max-width: 800px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .panel { background: white; border-radius: 20px; padding: 28px; box-shadow: 0 12px 30px rgba(0,45,80,0.08); }
+        
+        .panel-header { margin-bottom: 20px; }
+        .panel-header h3 { font-size: 17px; color: #003b6f; display: flex; align-items: center; gap: 8px; }
+        .panel-header p { font-size: 12px; color: #7e9bb6; margin-top: 4px; }
+        
+        .log-list { display: flex; flex-direction: column; gap: 6px; }
+        .log-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; font-size: 13px; transition: all 0.3s; }
+        .log-item.pending { opacity: 0.4; background: transparent; }
+        .log-item.active { background: #f0f7ff; opacity: 1; font-weight: 600; }
+        .log-item.done { opacity: 1; color: #1e293b; }
+        .log-item.warning { background: #fffdf5; opacity: 1; }
+        .log-item.error { background: #fef2f2; opacity: 1; }
+        
+        .log-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+        .log-icon.pending { background: #f1f5f9; color: #94a3b8; }
+        .log-icon.active { background: #003b6f; color: white; }
+        .log-icon.done { background: #d1fae5; color: #10b981; }
+        .log-icon.warning { background: #fef3c7; color: #f59e0b; }
+        .log-icon.error { background: #fee2e2; color: #ef4444; }
+        
+        .log-info { flex: 1; }
+        .log-name { font-size: 13px; color: #1e293b; }
+        .log-source { font-size: 10px; color: #94a3b8; }
+        .log-time { font-size: 10px; color: #64748b; text-align: right; }
+        
+        .progress-wrap { margin-bottom: 16px; }
+        .progress-text { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-bottom: 6px; }
+        .progress-bar { width: 100%; height: 4px; background: #e1e9f1; border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #003b6f; border-radius: 2px; transition: width 0.4s; width: 0%; }
+        
+        .result-card { border-radius: 16px; padding: 20px; text-align: center; margin-top: 8px; }
+        .result-card.approved { background: #f0fdf6; border: 2px solid #10b981; }
+        .result-card.declined { background: #fef2f2; border: 2px solid #ef4444; }
+        .result-card.review { background: #fffdf5; border: 2px solid #f59e0b; }
+        .result-icon { font-size: 40px; margin-bottom: 8px; }
+        .result-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+        .result-subtitle { font-size: 12px; color: #64748b; margin-bottom: 14px; }
+        
+        .result-params { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+        .result-param { background: white; border-radius: 10px; padding: 10px 12px; }
+        .result-param .rlabel { font-size: 9px; color: #7e9bb6; text-transform: uppercase; letter-spacing: 0.5px; }
+        .result-param .rvalue { font-size: 15px; font-weight: 700; color: #1e293b; }
+        
+        .btn { display: block; width: 100%; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; border: none; text-align: center; transition: 0.2s; }
+        .btn-primary { background: #003b6f; color: white; }
+        .btn-outline { background: white; border: 1px solid #cbd5e1; color: #64748b; margin-top: 6px; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; margin-top: 6px; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-primary:hover { background: #002d56; }
+        .btn-outline:hover { border-color: #003b6f; color: #003b6f; }
+        
+        .reset-btn { grid-column: 1 / -1; text-align: center; }
+        .reset-btn button { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 12px; text-decoration: underline; }
+        .reset-btn button:hover { color: #003b6f; }
+
+        .detail-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; color: #64748b; }
+        .detail-row b { color: #1e293b; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="app">
+    <!-- ЛЕВАЯ ПАНЕЛЬ: Ход проверки -->
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-robot"></i> Прескоринг</h3>
+            <p id="statusText">Заявка №4421-И · Александр Кузнецов</p>
+        </div>
+        
+        <div class="progress-wrap">
+            <div class="progress-text"><span>Прогресс</span><span id="progressLabel">0 из 6 шагов</span></div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+        
+        <div class="log-list" id="logList"></div>
+    </div>
+
+    <!-- ПРАВАЯ ПАНЕЛЬ: Результат / Параметры -->
+    <div class="panel" id="rightPanel">
+        <div class="panel-header">
+            <h3><i class="fas fa-clipboard-check"></i> Параметры заявки</h3>
+            <p>Данные клиента и объекта залога</p>
+        </div>
+        
+        <div style="font-size:12px;color:#64748b;line-height:1.8;" id="paramsBlock">
+            <div class="detail-row"><span>Клиент</span><b>Александр Кузнецов</b></div>
+            <div class="detail-row"><span>Сумма кредита</span><b>5 000 000 ₽</b></div>
+            <div class="detail-row"><span>Срок</span><b>15 лет</b></div>
+            <div class="detail-row"><span>Доход (подтв.)</span><b>180 000 ₽/мес</b></div>
+            <div class="detail-row"><span>Объект залога</span><b>Крылатская, 15</b></div>
+            <div class="detail-row"><span>Оценка Ocenka.mobi</span><b>8 500 000 ₽</b></div>
+            <div class="detail-row"><span>LTV (предв.)</span><b>60%</b></div>
+            <div class="detail-row"><span>ЕСИА</span><b style="color:#1e40af;">Подключён ✓</b></div>
+        </div>
+        
+        <div id="resultBlock" style="margin-top:16px;"></div>
+        
+        <div id="actionBlock" style="margin-top:12px;"></div>
+    </div>
+    
+    <div class="reset-btn"><button onclick="resetPrescoring()">🔄 Перезапустить</button></div>
+</div>
+
+<script>
+var prescoreSteps = [
+    { name: 'Верификация цифрового профиля (ЕСИА)', source: 'Госуслуги', time: '1.1 сек', detail: 'ФИО, паспорт, ИНН, СНИЛС, адрес регистрации, семейное положение.', result: 'Профиль подтверждён. Данные актуальны на 14.06.2026.' },
+    { name: 'Запрос кредитной истории (НБКИ)', source: 'НБКИ', time: '1.4 сек', detail: 'Кредитный рейтинг, текущие обязательства, просрочки.', result: 'Рейтинг: 720. Просрочек нет. Нагрузка: умеренная.' },
+    { name: 'Экспресс-оценка недвижимости', source: 'Ocenka.mobi', time: '1.8 сек', detail: 'Быстрая оценка по адресу и кадастровому номеру.', result: 'Ориентировочная стоимость: 8 500 000 ₽. LTV: 60%.' },
+    { name: 'Проверка дохода', source: 'ФНС / ЕСИА', time: '1.6 сек', detail: 'Сверка дохода по 2-НДФЛ с данными ЕСИА.', result: 'Доход подтверждён: 180 000 ₽/мес. Совпадение 100%.' },
+    { name: 'Анализ долговой нагрузки (PTI/DTI)', source: 'Loginom', time: '0.9 сек', detail: 'Расчёт PTI и DTI на основе подтверждённого дохода.', result: 'PTI: 38%. DTI: 42%. В пределах нормы.' },
+    { name: 'Формирование предварительного решения', source: 'Внутренний', time: '0.6 сек', detail: 'Анализ всех факторов. Расчёт предварительных условий.', result: 'Предварительное решение сформировано.' }
+];
+
+var currentStep = 0;
+var isRunning = false;
+
+function renderLogList() {
+    var h = '';
+    for (var i = 0; i < prescoreSteps.length; i++) {
+        var cls = 'pending';
+        var iconCls = 'pending';
+        var icon = 'far fa-circle';
+        var timeText = prescoreSteps[i].time;
+        
+        if (i < currentStep) {
+            cls = 'done';
+            iconCls = 'done';
+            icon = 'fas fa-check-circle';
+            timeText = '✓ ' + prescoreSteps[i].time;
+        } else if (i === currentStep && isRunning) {
+            cls = 'active';
+            iconCls = 'active';
+            icon = 'fas fa-sync-alt fa-spin';
+            timeText = '...';
+        }
+        
+        h += '<div class="log-item ' + cls + '">';
+        h += '<div class="log-icon ' + iconCls + '"><i class="' + icon + '"></i></div>';
+        h += '<div class="log-info"><div class="log-name">' + prescoreSteps[i].name + '</div><div class="log-source">' + prescoreSteps[i].source + '</div></div>';
+        h += '<div class="log-time">' + timeText + '</div>';
+        h += '</div>';
+    }
+    document.getElementById('logList').innerHTML = h;
+}
+
+function updateProgress() {
+    var pct = Math.round((currentStep / prescoreSteps.length) * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = currentStep + ' из ' + prescoreSteps.length + ' шагов';
+}
+
+function showResult(outcome) {
+    isRunning = false;
+    currentStep = prescoreSteps.length;
+    renderLogList();
+    updateProgress();
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('progressLabel').textContent = prescoreSteps.length + ' из ' + prescoreSteps.length + ' шагов';
+    document.getElementById('statusText').textContent = 'Заявка №4421-И · Александр Кузнецов · Проверка завершена';
+    
+    var resultHTML = '';
+    var actionHTML = '';
+    
+    if (outcome === 'approved') {
+        resultHTML = '<div class="result-card approved">';
+        resultHTML += '<div class="result-icon">✅</div>';
+        resultHTML += '<div class="result-title" style="color:#065f46;">Прескоринг пройден</div>';
+        resultHTML += '<div class="result-subtitle">Клиент может быть направлен на полный скоринг</div>';
+        resultHTML += '<div class="result-params">';
+        resultHTML += '<div class="result-param"><div class="rlabel">Предв. лимит</div><div class="rvalue" style="color:#003b6f;">5 400 000 ₽</div></div>';
+        resultHTML += '<div class="result-param"><div class="rlabel">Предв. ставка</div><div class="rvalue" style="color:#10b981;">12.5%</div></div>';
+        resultHTML += '<div class="result-param"><div class="rlabel">PTI</div><div class="rvalue" style="color:#10b981;">38%</div></div>';
+        resultHTML += '<div class="result-param"><div class="rlabel">LTV</div><div class="rvalue" style="color:#10b981;">60%</div></div>';
+        resultHTML += '</div></div>';
+        
+        actionHTML = '<button class="btn btn-success" onclick="alert(\'Заявка направлена на полный скоринг\')"><i class="fas fa-robot"></i> Запустить полный скоринг</button>';
+        actionHTML += '<button class="btn btn-outline" onclick="alert(\'Открывается чат с клиентом\')"><i class="fas fa-comment-dots"></i> Сообщить клиенту</button>';
+    } else if (outcome === 'declined') {
+        resultHTML = '<div class="result-card declined">';
+        resultHTML += '<div class="result-icon">❌</div>';
+        resultHTML += '<div class="result-title" style="color:#991b1b;">Прескоринг не пройден</div>';
+        resultHTML += '<div class="result-subtitle">Выявлены стоп-факторы, требующие внимания</div>';
+        resultHTML += '<div class="result-params">';
+        resultHTML += '<div class="result-param"><div class="rlabel">Проблема</div><div class="rvalue" style="font-size:13px;color:#991b1b;">PTI > 50%</div></div>';
+        resultHTML += '<div class="result-param"><div class="rlabel">Макс. сумма</div><div class="rvalue" style="color:#f59e0b;">4 200 000 ₽</div></div>';
+        resultHTML += '</div></div>';
+        
+        actionHTML = '<button class="btn btn-warning" onclick="alert(\'Открывается форма изменения параметров\')"><i class="fas fa-edit"></i> Предложить изменить параметры</button>';
+        actionHTML += '<button class="btn btn-danger" onclick="alert(\'Заявка отклонена\')"><i class="fas fa-times"></i> Отклонить заявку</button>';
+        actionHTML += '<button class="btn btn-outline" onclick="alert(\'Открывается чат с клиентом\')"><i class="fas fa-comment-dots"></i> Связаться с клиентом</button>';
+    } else {
+        resultHTML = '<div class="result-card review">';
+        resultHTML += '<div class="result-icon">⚠️</div>';
+        resultHTML += '<div class="result-title" style="color:#92400e;">Требуется проверка</div>';
+        resultHTML += '<div class="result-subtitle">Недостаточно данных для однозначного решения</div>';
+        resultHTML += '<div class="result-params">';
+        resultHTML += '<div class="result-param"><div class="rlabel">Проблема</div><div class="rvalue" style="font-size:13px;color:#92400e;">Расхождение данных</div></div>';
+        resultHTML += '<div class="result-param"><div class="rlabel">Источник</div><div class="rvalue" style="font-size:13px;">ФНС vs ЕСИА</div></div>';
+        resultHTML += '</div></div>';
+        
+        actionHTML = '<button class="btn btn-primary" onclick="alert(\'Запрос отправлен\')"><i class="fas fa-file-upload"></i> Запросить документы</button>';
+        actionHTML += '<button class="btn btn-outline" onclick="alert(\'Открывается чат с клиентом\')"><i class="fas fa-comment-dots"></i> Уточнить у клиента</button>';
+    }
+    
+    document.getElementById('resultBlock').innerHTML = resultHTML;
+    document.getElementById('actionBlock').innerHTML = actionHTML;
+}
+
+function runPrescoring() {
+    isRunning = true;
+    currentStep = 0;
+    document.getElementById('resultBlock').innerHTML = '';
+    document.getElementById('actionBlock').innerHTML = '';
+    document.getElementById('statusText').textContent = 'Заявка №4421-И · Александр Кузнецов · Идёт проверка...';
+    
+    renderLogList();
+    updateProgress();
+    
+    var delays = [1100, 1400, 1800, 1600, 900, 600];
+    
+    function processStep(stepIndex) {
+        if (stepIndex >= prescoreSteps.length) {
+            currentStep = prescoreSteps.length;
+            renderLogList();
+            updateProgress();
+            
+            setTimeout(function() {
+                var outcomes = ['approved', 'approved', 'declined', 'review'];
+                var outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
+                showResult(outcome);
+            }, 500);
+            return;
+        }
+        
+        currentStep = stepIndex;
+        renderLogList();
+        updateProgress();
+        
+        setTimeout(function() {
+            processStep(stepIndex + 1);
+        }, delays[stepIndex]);
+    }
+    
+    processStep(0);
+}
+
+function resetPrescoring() {
+    runPrescoring();
+}
+
+// Старт
+runPrescoring();
+</script>
+
+</body>
+</html>

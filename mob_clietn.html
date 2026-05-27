@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>БЖФ Банк · Мобильный клиент</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background: #1a1a2e; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .phone-frame { width: 375px; height: 812px; background: #f0f4f8; border-radius: 40px; overflow: hidden; position: relative; box-shadow: 0 0 0 8px #1a1a2e, 0 0 0 10px #333, 0 20px 60px rgba(0,0,0,0.5); }
+        .phone-notch { width: 150px; height: 28px; background: #1a1a2e; border-radius: 0 0 20px 20px; position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 10; }
+        .phone-screen { height: 100%; overflow-y: auto; padding: 40px 16px 16px; display: flex; flex-direction: column; }
+        .phone-screen::-webkit-scrollbar { display: none; }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        .header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .logo { background: #003b6f; color: white; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 16px; }
+        .header h1 { font-size: 16px; color: #003b6f; }
+        .header p { font-size: 11px; color: #7e9bb6; }
+
+        .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .card-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .card-title { font-weight: 700; font-size: 14px; color: #003b6f; }
+        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+        .badge-active { background: #dbeafe; color: #1e40af; }
+        .badge-done { background: #d1fae5; color: #065f46; }
+        .badge-reject { background: #fee2e2; color: #991b1b; }
+        .badge-draft { background: #f1f5f9; color: #475569; }
+
+        .mini-stepper { display: flex; gap: 4px; align-items: center; margin: 10px 0; }
+        .mini-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
+        .mini-dot.done { background: #10b981; }
+        .mini-dot.current { background: #003b6f; width: 10px; height: 10px; }
+        .mini-line { width: 16px; height: 1px; background: #cbd5e1; }
+
+        .btn { display: block; width: 100%; padding: 12px; border-radius: 12px; font-weight: 700; font-size: 13px; text-align: center; cursor: pointer; border: none; }
+        .btn-primary { background: #003b6f; color: white; }
+        .btn-outline { background: white; border: 1px solid #cbd5e1; color: #64748b; margin-top: 6px; }
+
+        .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .quick-action { background: #f8fbff; border-radius: 12px; padding: 14px; text-align: center; cursor: pointer; font-size: 12px; font-weight: 600; color: #1e293b; }
+        .quick-action i { font-size: 18px; color: #003b6f; margin-bottom: 4px; display: block; }
+
+        .preoffer { background: linear-gradient(135deg, #f0fdf6, #d1fae5); border-radius: 14px; padding: 16px; text-align: center; }
+        .preoffer .amount { font-size: 24px; font-weight: 800; color: #003b6f; }
+        .preoffer .rate { font-size: 12px; color: #065f46; }
+
+        .nav-bar { display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #e1e9f1; background: white; margin-top: auto; border-radius: 0 0 40px 40px; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; color: #94a3b8; cursor: pointer; }
+        .nav-item.active { color: #003b6f; }
+        .nav-item i { font-size: 18px; }
+
+        .notification { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+        .notif-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .notif-dot.warn { background: #f59e0b; }
+        .notif-dot.info { background: #3b82f6; }
+        .notif-dot.ok { background: #10b981; }
+
+        .app-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: #f8fbff; border-radius: 12px; margin-bottom: 8px; cursor: pointer; }
+        .app-item .app-num { font-weight: 700; font-size: 13px; color: #003b6f; }
+        .app-item .app-date { font-size: 10px; color: #94a3b8; }
+        .app-item .app-amount { font-weight: 700; font-size: 14px; color: #1e293b; }
+        .app-item .app-client { font-size: 11px; color: #64748b; }
+
+        .detail-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { color: #7e9bb6; }
+        .detail-value { font-weight: 600; color: #1e293b; }
+
+        .back-btn { display: flex; align-items: center; gap: 6px; color: #003b6f; font-weight: 600; font-size: 13px; cursor: pointer; margin-bottom: 12px; }
+
+        .chat-msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 12px; line-height: 1.4; margin-bottom: 8px; }
+        .chat-msg.client { background: #003b6f; color: white; align-self: flex-end; text-align: right; margin-left: auto; }
+        .chat-msg.manager { background: white; border: 1px solid #e1e9f1; color: #1e293b; align-self: flex-start; }
+
+        .property-card { background: #f8fbff; border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+        .property-card .prop-addr { font-weight: 600; font-size: 13px; color: #1e293b; }
+        .property-card .prop-meta { font-size: 11px; color: #64748b; margin-top: 4px; }
+        .property-card .prop-price { font-weight: 700; color: #10b981; font-size: 13px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="phone-frame">
+    <div class="phone-notch"></div>
+    <div class="phone-screen" id="phoneScreen">
+
+        <!-- ЭКРАН: ДАШБОРД -->
+        <div class="screen active" id="scr-dashboard">
+            <div class="header">
+                <div class="logo">Б</div>
+                <div><h1>БЖФ БАНК</h1><p>Александр К. · ЕСИА ✓</p></div>
+            </div>
+
+            <div class="card">
+                <div class="card-row"><span class="card-title">Заявка №4421-И</span><span class="badge badge-active">В обработке</span></div>
+                <div class="mini-stepper">
+                    <div class="mini-dot done"></div><div class="mini-line"></div>
+                    <div class="mini-dot done"></div><div class="mini-line"></div>
+                    <div class="mini-dot current"></div><div class="mini-line"></div>
+                    <div class="mini-dot"></div><div class="mini-line"></div>
+                    <div class="mini-dot"></div>
+                </div>
+                <div style="font-size:12px;color:#64748b;">5 000 000 ₽ · 15 лет</div>
+                <button class="btn btn-primary" style="margin-top:10px;" onclick="showScreen('applications')">Продолжить оформление</button>
+            </div>
+
+            <div class="preoffer" style="margin-bottom:12px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#065f46;">Предодобренный лимит</div>
+                <div class="amount">до 6,2 млн ₽</div>
+                <div class="rate">Ставка от 12.3%</div>
+            </div>
+
+            <div class="quick-actions">
+                <div class="quick-action" onclick="showScreen('applications')"><i class="fas fa-plus-circle"></i> Новая заявка</div>
+                <div class="quick-action" onclick="showScreen('applications')"><i class="fas fa-file-signature"></i> Мои заявки</div>
+                <div class="quick-action" onclick="showScreen('profile')"><i class="fas fa-home"></i> Недвижимость</div>
+                <div class="quick-action" onclick="showScreen('profile')"><i class="fas fa-user"></i> Профиль</div>
+            </div>
+
+            <div class="card" style="margin-top:12px;">
+                <div style="font-weight:700;font-size:13px;color:#003b6f;margin-bottom:8px;">Уведомления</div>
+                <div class="notification"><div class="notif-dot warn"></div><div>Загрузите справку 2-НДФЛ</div></div>
+                <div class="notification"><div class="notif-dot info"></div><div>Оценка недвижимости завершена</div></div>
+                <div class="notification"><div class="notif-dot ok"></div><div>Данные ЕСИА синхронизированы</div></div>
+            </div>
+        </div>
+
+        <!-- ЭКРАН: ЗАЯВКИ -->
+        <div class="screen" id="scr-applications">
+            <div class="back-btn" onclick="showScreen('dashboard')"><i class="fas fa-arrow-left"></i> Назад</div>
+            <div style="font-weight:700;font-size:16px;color:#003b6f;margin-bottom:12px;">Мои заявки</div>
+
+            <div class="app-item" onclick="showScreen('app-detail')">
+                <div><div class="app-num">№4421-И</div><div class="app-client">Кредит под залог</div><div style="font-size:10px;color:#94a3b8;">15.06.2026</div></div>
+                <div style="text-align:right;"><div class="app-amount">5 000 000 ₽</div><span class="badge badge-active">В обработке</span></div>
+            </div>
+            <div class="app-item">
+                <div><div class="app-num">№3890-И</div><div class="app-client">Кредит под залог</div><div style="font-size:10px;color:#94a3b8;">03.02.2026</div></div>
+                <div style="text-align:right;"><div class="app-amount">4 200 000 ₽</div><span class="badge badge-done">Одобрено</span></div>
+            </div>
+            <div class="app-item">
+                <div><div class="app-num">№3701-И</div><div class="app-client">Кредит под залог</div><div style="font-size:10px;color:#94a3b8;">12.11.2025</div></div>
+                <div style="text-align:right;"><div class="app-amount">6 000 000 ₽</div><span class="badge badge-reject">Отказ</span></div>
+            </div>
+            <div class="app-item">
+                <div><div class="app-num">№3600-И</div><div class="app-client">Кредит под залог</div><div style="font-size:10px;color:#94a3b8;">01.09.2025</div></div>
+                <div style="text-align:right;"><div class="app-amount">3 000 000 ₽</div><span class="badge badge-draft">Черновик</span></div>
+            </div>
+        </div>
+
+        <!-- ЭКРАН: ДЕТАЛИ ЗАЯВКИ -->
+        <div class="screen" id="scr-app-detail">
+            <div class="back-btn" onclick="showScreen('applications')"><i class="fas fa-arrow-left"></i> К заявкам</div>
+            <div style="font-weight:700;font-size:16px;color:#003b6f;margin-bottom:4px;">Заявка №4421-И</div>
+            <span class="badge badge-active" style="margin-bottom:12px;">В обработке</span>
+
+            <div class="mini-stepper" style="margin-bottom:14px;">
+                <div class="mini-dot done"></div><div class="mini-line"></div>
+                <div class="mini-dot done"></div><div class="mini-line"></div>
+                <div class="mini-dot current"></div><div class="mini-line"></div>
+                <div class="mini-dot"></div><div class="mini-line"></div>
+                <div class="mini-dot"></div>
+            </div>
+
+            <div class="card">
+                <div class="detail-row"><span class="detail-label">Сумма</span><span class="detail-value">5 000 000 ₽</span></div>
+                <div class="detail-row"><span class="detail-label">Срок</span><span class="detail-value">15 лет</span></div>
+                <div class="detail-row"><span class="detail-label">Ставка</span><span class="detail-value" style="color:#94a3b8;">ожидается</span></div>
+                <div class="detail-row"><span class="detail-label">Объект залога</span><span class="detail-value" style="font-size:11px;">Крылатская, 15</span></div>
+                <div class="detail-row"><span class="detail-label">Оценка</span><span class="detail-value" style="color:#10b981;">8 500 000 ₽</span></div>
+            </div>
+
+            <div class="card" style="background:#fffdf5;border:1px solid #f59e0b;">
+                <div style="font-weight:700;font-size:12px;color:#92400e;margin-bottom:6px;">⚠️ Необходимо загрузить:</div>
+                <div style="font-size:11px;color:#92400e;">• Справка 2-НДФЛ</div>
+            </div>
+
+            <button class="btn btn-primary" style="margin-top:8px;">Продолжить оформление</button>
+            <button class="btn btn-outline" onclick="showScreen('chat')"><i class="fas fa-comment-dots"></i> Чат с менеджером</button>
+        </div>
+
+        <!-- ЭКРАН: ПРОФИЛЬ -->
+        <div class="screen" id="scr-profile">
+            <div class="back-btn" onclick="showScreen('dashboard')"><i class="fas fa-arrow-left"></i> Назад</div>
+            <div style="font-weight:700;font-size:16px;color:#003b6f;margin-bottom:12px;">Профиль</div>
+
+            <div style="display:flex;gap:4px;margin-bottom:16px;background:#edf2f7;border-radius:10px;padding:4px;">
+                <button style="flex:1;padding:8px;border:none;background:white;border-radius:8px;font-size:11px;font-weight:600;color:#003b6f;" onclick="showProfileTab('property')">Недвижимость</button>
+                <button style="flex:1;padding:8px;border:none;background:transparent;border-radius:8px;font-size:11px;font-weight:600;color:#718096;" id="tab-personal" onclick="showProfileTab('personal')">Данные</button>
+                <button style="flex:1;padding:8px;border:none;background:transparent;border-radius:8px;font-size:11px;font-weight:600;color:#718096;" id="tab-income" onclick="showProfileTab('income')">Доходы</button>
+            </div>
+
+            <div id="profile-tab-property">
+                <div class="property-card">
+                    <div class="prop-addr">Квартира · 65 м²</div>
+                    <div class="prop-meta">Крылатская, 15 · 7 из 12 эт. · 2015 г.</div>
+                    <div class="prop-price">💰 8 500 000 ₽</div>
+                </div>
+                <div class="property-card">
+                    <div class="prop-addr">Апартаменты · 48 м²</div>
+                    <div class="prop-meta">Пресненская наб., 8 · 15 из 25 эт. · 2019 г.</div>
+                    <div class="prop-price">💰 7 200 000 ₽</div>
+                </div>
+                <div class="property-card">
+                    <div class="prop-addr">Дом · 180 м²</div>
+                    <div class="prop-meta">д. Жуковка, ул. Лесная, 5 · 2010 г.</div>
+                    <div class="prop-price" style="color:#94a3b8;">Без оценки</div>
+                </div>
+            </div>
+
+            <div id="profile-tab-personal" style="display:none;">
+                <div class="card">
+                    <div class="detail-row"><span class="detail-label">ФИО</span><span class="detail-value">Кузнецов Александр</span></div>
+                    <div class="detail-row"><span class="detail-label">Телефон</span><span class="detail-value">+7 (999) 123-45-67</span></div>
+                    <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">a.kuznetsov@mail.ru</span></div>
+                    <div class="detail-row"><span class="detail-label">Паспорт</span><span class="detail-value">4510 123456</span></div>
+                    <div class="detail-row"><span class="detail-label">Источник</span><span class="detail-value" style="color:#1e40af;">Госуслуги ✓</span></div>
+                </div>
+            </div>
+
+            <div id="profile-tab-income" style="display:none;">
+                <div class="card">
+                    <div class="detail-row"><span class="detail-label">Место работы</span><span class="detail-value">ООО «ТехноСофт»</span></div>
+                    <div class="detail-row"><span class="detail-label">Должность</span><span class="detail-value">Руководитель отдела</span></div>
+                    <div class="detail-row"><span class="detail-label">Доход</span><span class="detail-value">180 000 ₽</span></div>
+                    <div class="detail-row"><span class="detail-label">Стаж</span><span class="detail-value">3-5 лет</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ЭКРАН: ЧАТ -->
+        <div class="screen" id="scr-chat">
+            <div class="back-btn" onclick="showScreen('applications')"><i class="fas fa-arrow-left"></i> Назад</div>
+            <div style="font-weight:700;font-size:16px;color:#003b6f;margin-bottom:4px;">Чат с менеджером</div>
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:12px;">Елена Смирнова · Кредитный менеджер</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+                <div class="chat-msg manager">Александр, добрый день! Я ваш кредитный менеджер. Нужна помощь с заявкой?<div style="font-size:9px;opacity:0.5;margin-top:4px;">14:15</div></div>
+                <div class="chat-msg client">Здравствуйте! Какие документы нужны для подтверждения дохода?<div style="font-size:9px;opacity:0.5;margin-top:4px;">14:18</div></div>
+                <div class="chat-msg manager">Подойдёт 2-НДФЛ за 6 месяцев или справка по форме банка.<div style="font-size:9px;opacity:0.5;margin-top:4px;">14:19</div></div>
+            </div>
+            <div style="display:flex;gap:8px;"><input type="text" placeholder="Введите сообщение..." style="flex:1;padding:12px;border:1px solid #cbd5e1;border-radius:12px;font-size:12px;"><button style="width:40px;height:40px;border-radius:50%;background:#003b6f;color:white;border:none;cursor:pointer;"><i class="fas fa-paper-plane"></i></button></div>
+        </div>
+
+        <!-- НАВИГАЦИЯ -->
+        <div class="nav-bar">
+            <div class="nav-item active" onclick="showScreen('dashboard')"><i class="fas fa-th-large"></i> Главная</div>
+            <div class="nav-item" onclick="showScreen('applications')"><i class="fas fa-file-signature"></i> Заявки</div>
+            <div class="nav-item" onclick="showScreen('profile')"><i class="fas fa-user-circle"></i> Профиль</div>
+            <div class="nav-item" onclick="showScreen('chat')"><i class="fas fa-comment-dots"></i> Чат</div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showScreen(screen) {
+    document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+    document.getElementById('scr-' + screen).classList.add('active');
+    
+    document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+    var navMap = { dashboard: 0, applications: 1, profile: 2, chat: 3 };
+    if (navMap[screen] !== undefined) {
+        document.querySelectorAll('.nav-item')[navMap[screen]].classList.add('active');
+    }
+}
+
+function showProfileTab(tab) {
+    document.getElementById('profile-tab-property').style.display = (tab === 'property' ? 'block' : 'none');
+    document.getElementById('profile-tab-personal').style.display = (tab === 'personal' ? 'block' : 'none');
+    document.getElementById('profile-tab-income').style.display = (tab === 'income' ? 'block' : 'none');
+    
+    document.querySelectorAll('#scr-profile button').forEach(function(b) {
+        b.style.background = 'transparent';
+        b.style.color = '#718096';
+    });
+    var activeBtn = document.getElementById('tab-' + tab);
+    if (activeBtn) {
+        activeBtn.style.background = 'white';
+        activeBtn.style.color = '#003b6f';
+    }
+}
+</script>
+
+</body>
+</html>

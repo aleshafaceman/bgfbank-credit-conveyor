@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>БЖФ Банк · Скоринг (менеджер) — полная версия</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background: #f0f4f8; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        
+        .container { width: 100%; max-width: 960px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        
+        .card { background: white; border-radius: 20px; padding: 28px; box-shadow: 0 10px 30px rgba(0,45,80,0.08); }
+        .card h3 { font-size: 17px; color: #003b6f; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .card .subtitle { font-size: 12px; color: #7e9bb6; margin-bottom: 20px; }
+        
+        .progress-track { width: 100%; height: 6px; background: #e1e9f1; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #003b6f, #00509e); border-radius: 3px; transition: width 0.5s; }
+        .progress-label { font-size: 11px; color: #64748b; text-align: right; }
+        
+        .step-list { display: flex; flex-direction: column; gap: 3px; }
+        .step-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 12px; transition: 0.3s; }
+        .step-row.waiting { opacity: 0.4; }
+        .step-row.active { background: #f0f7ff; opacity: 1; }
+        .step-row.done { opacity: 1; }
+        .step-row.warn { background: #fffdf5; opacity: 1; }
+        .step-row.error { background: #fef2f2; opacity: 1; }
+        
+        .step-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .step-dot.waiting { background: #cbd5e1; }
+        .step-dot.active { background: #003b6f; width: 12px; height: 12px; }
+        .step-dot.done { background: #10b981; }
+        .step-dot.warn { background: #f59e0b; }
+        .step-dot.error { background: #ef4444; }
+        
+        .step-name { flex: 1; font-weight: 600; color: #1e293b; }
+        .step-source { font-size: 10px; color: #94a3b8; }
+        .step-time { font-size: 10px; color: #64748b; }
+        
+        .detail-section { margin-top: 16px; }
+        .detail-title { font-size: 13px; font-weight: 700; color: #003b6f; margin-bottom: 8px; }
+        .detail-list { font-size: 11px; color: #64748b; line-height: 1.8; }
+        .detail-list .ok { color: #10b981; }
+        .detail-list .curr { color: #003b6f; font-weight: 600; }
+        .detail-list .warn { color: #f59e0b; }
+        .detail-list .err { color: #ef4444; }
+        
+        .btn { padding: 10px 18px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; border: none; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #003b6f; color: white; }
+        .btn-outline { background: white; border: 1px solid #cbd5e1; color: #64748b; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn:hover { opacity: 0.9; }
+        .btn-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+        
+        .result-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 13px; margin-bottom: 16px; }
+        .result-badge.approved { background: #d1fae5; color: #065f46; }
+        .result-badge.rejected { background: #fee2e2; color: #991b1b; }
+        .result-badge.needs-info { background: #fef3c7; color: #92400e; }
+        
+        .params-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .param-item { background: #f8fbff; border-radius: 10px; padding: 10px 12px; }
+        .param-label { font-size: 9px; color: #7e9bb6; text-transform: uppercase; letter-spacing: 0.5px; }
+        .param-value { font-size: 15px; font-weight: 700; color: #1e293b; }
+        
+        .full-width { grid-column: 1 / -1; }
+        .reset-btn { text-align: center; }
+        .reset-btn button { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 13px; text-decoration: underline; }
+        .reset-btn button:hover { color: #003b6f; }
+        
+        .alert-card { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; font-size: 11px; }
+        .alert-card h4 { font-size: 13px; color: #92400e; margin-bottom: 4px; }
+        .alert-card p { color: #92400e; line-height: 1.5; }
+        .error-card { background: #fef2f2; border: 1px solid #ef4444; }
+        .error-card h4 { color: #991b1b; }
+        .error-card p { color: #991b1b; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,30,60,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; }
+        .modal-overlay.hidden { display: none; }
+        .modal { background: white; border-radius: 20px; padding: 32px; max-width: 500px; width: 90%; }
+        .modal h3 { font-size: 18px; color: #003b6f; margin-bottom: 8px; }
+        .modal .issue-desc { font-size: 13px; color: #64748b; margin-bottom: 16px; line-height: 1.6; }
+        .modal .issue-detail { background: #f8fbff; border-radius: 10px; padding: 12px; margin-bottom: 16px; font-size: 12px; }
+        .modal .issue-detail .row { display: flex; justify-content: space-between; padding: 4px 0; }
+        .modal .btn-row { justify-content: flex-end; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="app">
+    <!-- ЛЕВАЯ КОЛОНКА -->
+    <div>
+        <div class="card" style="margin-bottom:24px;">
+            <h3><i class="fas fa-robot"></i> <span id="headerTitle">Запуск скоринга</span></h3>
+            <p class="subtitle">Заявка №4421-И · Александр Кузнецов</p>
+            <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-label" id="progressLabel">0 из 8 шагов</div>
+            <div class="step-list" id="stepList"></div>
+        </div>
+        
+        <div class="card">
+            <div class="detail-section">
+                <div class="detail-title" id="detailTitle">Ожидание запуска...</div>
+                <div class="detail-list" id="detailContent">Система готова к запуску скоринга.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ПРАВАЯ КОЛОНКА -->
+    <div>
+        <div class="card" id="resultCard">
+            <h3><i class="fas fa-clipboard-check"></i> Результат</h3>
+            <p class="subtitle" id="resultSubtitle">Ожидание завершения скоринга...</p>
+            
+            <!-- Счётчики проблем -->
+            <div id="issueCounters" style="display:none;margin-bottom:12px;">
+                <div style="display:flex;gap:8px;font-size:11px;">
+                    <span style="background:#fef3c7;color:#92400e;padding:4px 8px;border-radius:6px;" id="warnCounter">⚠️ Предупреждений: 0</span>
+                    <span style="background:#fee2e2;color:#991b1b;padding:4px 8px;border-radius:6px;" id="errorCounter">❌ Ошибок: 0</span>
+                </div>
+            </div>
+            
+            <div id="resultArea">
+                <div style="text-align:center;padding:40px;color:#94a3b8;">
+                    <i class="fas fa-hourglass-half" style="font-size:40px;margin-bottom:12px;"></i>
+                    <p>Скоринг ещё не запущен</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card" style="margin-top:24px;">
+            <h3><i class="fas fa-cog"></i> Действия менеджера</h3>
+            <p class="subtitle">Управление процессом скоринга</p>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="runScoring()"><i class="fas fa-play"></i> Запустить</button>
+                <button class="btn btn-outline" onclick="resetScoring()"><i class="fas fa-redo"></i> Сброс</button>
+            </div>
+            <div class="btn-row" style="margin-top:8px;">
+                <button class="btn btn-outline" onclick="alert('Открывается ручная корректировка...')"><i class="fas fa-edit"></i> Ручная корректировка</button>
+                <button class="btn btn-outline" onclick="alert('Открывается чат с клиентом...')"><i class="fas fa-comment-dots"></i> Чат с клиентом</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="reset-btn full-width">
+        <button onclick="resetScoring()">🔄 Перезапустить демонстрацию</button>
+    </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО ПРОБЛЕМЫ -->
+<div class="modal-overlay hidden" id="issueModal">
+    <div class="modal" id="issueModalContent"></div>
+</div>
+
+<script>
+// Шаги скоринга с возможными проблемами
+var steps = [
+    { 
+        name: 'Кредитная история (НБКИ)', source: 'НБКИ', time: '1.2 сек',
+        detail_ok: 'Рейтинг: 720. Просрочек нет. 2 кредита.',
+        issues: [
+            { type: 'warning', title: 'Кредитная история не найдена', desc: 'В НБКИ отсутствуют данные по клиенту. Возможно, у клиента нет кредитной истории.', detail: 'Рекомендация: продолжить скоринг с пометкой "нет КИ".', actions: ['Продолжить', 'Отклонить'], prob: 10 },
+            { type: 'error', title: 'Обнаружены просрочки > 90 дней', desc: 'В кредитной истории зафиксированы просрочки более 90 дней за последние 12 месяцев.', detail: 'Стоп-фактор: высокая вероятность дефолта. Рекомендация: отказать.', actions: ['Отклонить заявку', 'Запросить объяснение'], prob: 10 }
+        ]
+    },
+    { 
+        name: 'Кредитная история (ОКБ)', source: 'ОКБ', time: '0.8 сек',
+        detail_ok: 'Данные совпадают. Расхождений нет.',
+        issues: []
+    },
+    { 
+        name: 'Верификация дохода (ФНС)', source: 'ФНС', time: '2.1 сек',
+        detail_ok: 'Доход: 180 000 ₽/мес. Подтверждён.',
+        issues: [
+            { type: 'error', title: 'Доход не подтверждён', desc: 'ФНС не подтвердила заявленный доход. Возможно, работодатель не подал сведения.', detail: 'Заявленный доход: 180 000 ₽/мес\nПодтверждённый доход: отсутствует\nРасхождение: 100%', actions: ['Запросить 2-НДФЛ у клиента', 'Отклонить'], prob: 15 },
+            { type: 'warning', title: 'Доход ниже заявленного', desc: 'ФНС подтвердила доход ниже заявленного клиентом.', detail: 'Заявленный доход: 180 000 ₽/мес\nПодтверждённый доход: 120 000 ₽/мес\nРасхождение: 33%\n\nЭто повлияет на максимальный лимит (-30%) и PTI.', actions: ['Продолжить с фактическим доходом', 'Запросить 2-НДФЛ', 'Отклонить'], prob: 20 }
+        ]
+    },
+    { 
+        name: 'Проверка работодателя', source: 'ЕГРЮЛ', time: '1.5 сек',
+        detail_ok: 'ООО «ТехноСофт» действует. Банкротств нет.',
+        issues: [
+            { type: 'warning', title: 'Работодатель не найден в ЕГРЮЛ', desc: 'Организация не найдена в реестре. Возможно, ИП или самозанятый.', detail: 'Рекомендация: запросить трудовую или договор ГПХ.', actions: ['Продолжить', 'Запросить трудовую'], prob: 10 },
+            { type: 'error', title: 'Работодатель в стадии банкротства', desc: 'Организация находится в процедуре банкротства.', detail: 'Стоп-фактор: риск потери работы клиентом.', actions: ['Отклонить заявку', 'Запросить пояснения'], prob: 5 }
+        ]
+    },
+    { 
+        name: 'Оценка недвижимости', source: 'Ocenka.mobi', time: '2.8 сек',
+        detail_ok: 'Стоимость: 8 500 000 ₽. Ликвидность: высокая.',
+        issues: [
+            { type: 'error', title: 'Сервис Ocenka.mobi недоступен', desc: 'Не удалось получить ответ от сервиса оценки. Таймаут запроса.', detail: 'Предыдущая оценка: 8 500 000 ₽ (от 10.06.2026).\nМожно использовать предыдущую или повторить запрос.', actions: ['Использовать предыдущую', 'Повторить запрос'], prob: 10 },
+            { type: 'error', title: 'Объект не найден по адресу', desc: 'Ocenka.mobi не смог определить объект по указанному адресу.', detail: 'Адрес: г. Москва, ул. Крылатская, д. 15, кв. 42\nВозможно, опечатка или новый адрес.', actions: ['Уточнить адрес у клиента', 'Ввести адрес вручную'], prob: 10 }
+        ]
+    },
+    { 
+        name: 'Андеррайтинг', source: 'Loginom', time: '3.2 сек',
+        detail_ok: 'PTI: 38%. DTI: 42%. Стоп-факторы: нет.',
+        issues: [
+            { type: 'error', title: 'PTI превышает 50%', desc: 'Показатель PTI (отношение платежа к доходу) превышает допустимый порог.', detail: 'PTI: 52% при максимуме 50%\nПлатёж: 54 000 ₽/мес\nДоход: 120 000 ₽/мес\n\nРекомендация: уменьшить сумму или увеличить срок.', actions: ['Предложить изменить параметры', 'Отклонить'], prob: 15 },
+            { type: 'warning', title: 'DTI выше рекомендуемого', desc: 'Показатель DTI (долговая нагрузка) выше рекомендуемого уровня.', detail: 'DTI: 58% при рекомендуемом максимуме 50%\nПовышенный риск, но не стоп-фактор.', actions: ['Продолжить', 'Запросить доп. информацию'], prob: 15 }
+        ]
+    },
+    { 
+        name: 'Расчёт условий', source: 'Внутренний', time: '1.0 сек',
+        detail_ok: 'Ставка: 12.5%. Лимит: 5 400 000 ₽.',
+        issues: [
+            { type: 'warning', title: 'Ставка повышена из-за рисков', desc: 'Базовая ставка увеличена на 0.5% из-за выявленных факторов риска.', detail: 'Базовая ставка: 12.0%\nИтоговая ставка: 12.5%\nПричина: расхождение дохода (ФНС vs ЕСИА)', actions: ['Принять', 'Запросить пересмотр'], prob: 20 }
+        ]
+    },
+    { 
+        name: 'Финальное решение', source: 'Внутренний', time: '0.8 сек',
+        detail_ok: 'Решение сформировано.',
+        issues: []
+    }
+];
+
+var currentStep = 0;
+var isRunning = false;
+var isPaused = false;
+var pendingIssue = null;
+var issueLog = [];
+
+function renderSteps() {
+    var h = '';
+    for (var i = 0; i < steps.length; i++) {
+        var cls = 'waiting';
+        var dotCls = 'waiting';
+        var timeText = steps[i].time;
+        var icon = '';
+        
+        if (i < currentStep) {
+            var hasIssue = issueLog.find(function(x) { return x.step === i; });
+            if (hasIssue) {
+                cls = hasIssue.type === 'error' ? 'error' : 'warn';
+                dotCls = hasIssue.type === 'error' ? 'error' : 'warn';
+                icon = hasIssue.type === 'error' ? ' ❌' : ' ⚠️';
+            } else {
+                cls = 'done';
+                dotCls = 'done';
+            }
+            timeText = '✓ ' + steps[i].time;
+        } else if (i === currentStep && isRunning) {
+            cls = 'active';
+            dotCls = 'active';
+            timeText = '...';
+        }
+        
+        h += '<div class="step-row ' + cls + '">';
+        h += '<div class="step-dot ' + dotCls + '"></div>';
+        h += '<div class="step-name">' + steps[i].name + icon + '</div>';
+        h += '<div class="step-source">' + steps[i].source + '</div>';
+        h += '<div class="step-time">' + timeText + '</div>';
+        h += '</div>';
+    }
+    document.getElementById('stepList').innerHTML = h;
+}
+
+function updateProgress() {
+    var pct = Math.round((currentStep / steps.length) * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = currentStep + ' из ' + steps.length + ' шагов';
+}
+
+function updateDetail(idx) {
+    if (idx < steps.length) {
+        var s = steps[idx];
+        document.getElementById('detailTitle').textContent = '🔍 ' + s.name;
+        document.getElementById('detailContent').innerHTML = '<span class="curr">⟳ Выполняется проверка...</span>';
+    }
+}
+
+function updateIssueCounters() {
+    var warns = issueLog.filter(function(x) { return x.type === 'warning'; }).length;
+    var errors = issueLog.filter(function(x) { return x.type === 'error'; }).length;
+    document.getElementById('warnCounter').textContent = '⚠️ Предупреждений: ' + warns;
+    document.getElementById('errorCounter').textContent = '❌ Ошибок: ' + errors;
+    document.getElementById('issueCounters').style.display = (warns + errors > 0) ? 'block' : 'none';
+}
+
+function showIssueModal(issue, stepIndex, callback) {
+    pendingIssue = { issue: issue, stepIndex: stepIndex, callback: callback };
+    var h = '';
+    h += '<h3>' + (issue.type === 'error' ? '❌ Ошибка' : '⚠️ Предупреждение') + ' на шаге ' + (stepIndex + 1) + '</h3>';
+    h += '<div class="issue-desc">' + issue.title + '</div>';
+    h += '<div class="issue-desc" style="color:#64748b;">' + issue.desc + '</div>';
+    if (issue.detail) {
+        h += '<div class="issue-detail">';
+        issue.detail.split('\n').forEach(function(line) {
+            h += '<div class="row"><span>' + line + '</span></div>';
+        });
+        h += '</div>';
+    }
+    h += '<div class="btn-row">';
+    issue.actions.forEach(function(action, i) {
+        h += '<button class="btn ' + (i === 0 ? 'btn-primary' : 'btn-outline') + '" onclick="resolveIssue(' + i + ')">' + action + '</button>';
+    });
+    h += '</div>';
+    
+    document.getElementById('issueModalContent').innerHTML = h;
+    document.getElementById('issueModal').classList.remove('hidden');
+}
+
+function resolveIssue(actionIndex) {
+    document.getElementById('issueModal').classList.add('hidden');
+    
+    if (pendingIssue) {
+        var issue = pendingIssue.issue;
+        var stepIndex = pendingIssue.stepIndex;
+        
+        // Логируем проблему
+        issueLog.push({
+            step: stepIndex,
+            stepName: steps[stepIndex].name,
+            type: issue.type,
+            title: issue.title,
+            resolved: actionIndex === 0 ? (issue.type === 'error' ? 'Продолжено менеджером' : 'Принято') : issue.actions[actionIndex]
+        });
+        
+        updateIssueCounters();
+        
+        // Для ошибок: если менеджер выбрал не первую кнопку — прерываем
+        if (issue.type === 'error' && actionIndex > 0) {
+            // Отклонено или запрошены документы
+            showFinalResult('rejected');
+            return;
+        }
+        
+        // Продолжаем
+        if (pendingIssue.callback) pendingIssue.callback();
+        pendingIssue = null;
+    }
+}
+
+function showFinalResult(outcome) {
+    isRunning = false;
+    currentStep = steps.length;
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('progressLabel').textContent = steps.length + ' из ' + steps.length + ' шагов';
+    document.getElementById('headerTitle').textContent = 'Скоринг завершён';
+    document.getElementById('detailTitle').textContent = '✅ Проверки завершены';
+    document.getElementById('detailContent').innerHTML = '<span class="ok">✓ Система завершила обработку.</span>';
+    renderSteps();
+    updateIssueCounters();
+    
+    var h = '';
+    
+    // Сводка проблем
+    if (issueLog.length > 0) {
+        h += '<div style="margin-bottom:16px;">';
+        h += '<div style="font-weight:700;font-size:13px;color:#003b6f;margin-bottom:8px;">📋 Обнаруженные проблемы:</div>';
+        issueLog.forEach(function(log) {
+            var cls = log.type === 'error' ? 'error-card' : '';
+            h += '<div class="alert-card ' + cls + '">';
+            h += '<h4>' + (log.type === 'error' ? '❌' : '⚠️') + ' ' + log.stepName + '</h4>';
+            h += '<p>' + log.title + '</p>';
+            h += '<p style="font-size:10px;margin-top:4px;">Решение: ' + log.resolved + '</p>';
+            h += '</div>';
+        });
+        h += '</div>';
+    }
+    
+    if (outcome === 'approved') {
+        document.getElementById('resultSubtitle').textContent = 'Заявка одобрена';
+        h += '<div class="result-badge approved"><i class="fas fa-check-circle"></i> Кредит одобрен</div>';
+        h += '<div class="params-grid">';
+        h += '<div class="param-item"><div class="param-label">Лимит</div><div class="param-value" style="color:#003b6f;">5 400 000 ₽</div></div>';
+        h += '<div class="param-item"><div class="param-label">Ставка</div><div class="param-value" style="color:#10b981;">12.5%</div></div>';
+        h += '<div class="param-item"><div class="param-label">Срок</div><div class="param-value">15 лет</div></div>';
+        h += '<div class="param-item"><div class="param-label">Платёж</div><div class="param-value">~ 54 000 ₽</div></div>';
+        h += '</div>';
+        h += '<div class="btn-row"><button class="btn btn-success" onclick="alert(\'Заявка одобрена\')"><i class="fas fa-check"></i> Одобрить</button><button class="btn btn-outline" onclick="alert(\'Чат открыт\')"><i class="fas fa-comment-dots"></i> Чат</button></div>';
+    } else if (outcome === 'rejected') {
+        document.getElementById('resultSubtitle').textContent = 'Заявка отклонена';
+        h += '<div class="result-badge rejected"><i class="fas fa-times-circle"></i> В кредите отказано</div>';
+        h += '<div style="font-size:12px;color:#64748b;margin-bottom:12px;">Обнаружены стоп-факторы при проверке.</div>';
+        h += '<div class="btn-row"><button class="btn btn-danger" onclick="alert(\'Заявка отклонена\')"><i class="fas fa-times"></i> Отклонить</button><button class="btn btn-outline" onclick="alert(\'Чат открыт\')"><i class="fas fa-comment-dots"></i> Чат</button></div>';
+    }
+    
+    document.getElementById('resultArea').innerHTML = h;
+}
+
+function runScoring() {
+    isRunning = true;
+    isPaused = false;
+    currentStep = 0;
+    issueLog = [];
+    
+    document.getElementById('resultArea').innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;"><i class="fas fa-sync-alt fa-spin" style="font-size:24px;margin-bottom:8px;"></i><p style="font-size:12px;">Скоринг выполняется...</p></div>';
+    document.getElementById('resultSubtitle').textContent = 'Идёт проверка...';
+    document.getElementById('headerTitle').textContent = 'Идёт скоринг';
+    document.getElementById('issueCounters').style.display = 'none';
+    
+    renderSteps();
+    updateProgress();
+    updateDetail(0);
+    
+    var delays = [1200, 800, 2100, 1500, 2800, 3200, 1000, 800];
+    
+    function processStep(stepIndex) {
+        if (isPaused) return;
+        
+        if (stepIndex >= steps.length) {
+            currentStep = steps.length;
+            renderSteps();
+            updateProgress();
+            showFinalResult('approved');
+            return;
+        }
+        
+        currentStep = stepIndex;
+        renderSteps();
+        updateProgress();
+        updateDetail(stepIndex);
+        
+        // Проверяем, есть ли проблема на этом шаге
+        var step = steps[stepIndex];
+        var hasIssue = false;
+        
+        if (step.issues && step.issues.length > 0) {
+            // Случайным образом определяем, возникнет ли проблема
+            var totalProb = 0;
+            step.issues.forEach(function(iss) { totalProb += iss.prob; });
+            
+            var roll = Math.random() * 100;
+            if (roll < totalProb) {
+                // Выбираем конкретную проблему
+                var cumulative = 0;
+                for (var i = 0; i < step.issues.length; i++) {
+                    cumulative += step.issues[i].prob;
+                    if (roll < cumulative) {
+                        hasIssue = true;
+                        showIssueModal(step.issues[i], stepIndex, function() {
+                            processStep(stepIndex + 1);
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (!hasIssue) {
+            // Продолжаем без проблем
+            setTimeout(function() {
+                processStep(stepIndex + 1);
+            }, delays[stepIndex]);
+        }
+    }
+    
+    processStep(0);
+}
+
+function resetScoring() {
+    isRunning = false;
+    isPaused = false;
+    currentStep = 0;
+    issueLog = [];
+    pendingIssue = null;
+    
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressLabel').textContent = '0 из 8 шагов';
+    document.getElementById('headerTitle').textContent = 'Запуск скоринга';
+    document.getElementById('detailTitle').textContent = 'Ожидание запуска...';
+    document.getElementById('detailContent').innerHTML = 'Система готова к запуску скоринга.';
+    document.getElementById('resultSubtitle').textContent = 'Ожидание завершения скоринга...';
+    document.getElementById('resultArea').innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;"><i class="fas fa-hourglass-half" style="font-size:40px;margin-bottom:12px;"></i><p>Скоринг ещё не запущен</p></div>';
+    document.getElementById('issueCounters').style.display = 'none';
+    document.getElementById('issueModal').classList.add('hidden');
+    renderSteps();
+}
+
+// Старт
+renderSteps();
+</script>
+
+</body>
+</html>
