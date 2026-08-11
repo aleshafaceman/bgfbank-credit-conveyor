@@ -33,6 +33,15 @@ function openManagerScoring() {
     sCurrent = 0;
     sIssueLog = [];
     sPaused = false;
+
+    var appId = (typeof selectedAppId !== 'undefined' && selectedAppId) ? selectedAppId : '4421-И';
+    var apps = typeof getAllApplications === 'function' ? getAllApplications() : [];
+    var app = apps.find(function(a) { return a.id === appId; });
+    var titleEl = document.querySelector('#scoringOverlay .scoring-left h3');
+    var subEl = document.querySelector('#scoringOverlay .scoring-left .subtitle');
+    if (titleEl) titleEl.innerHTML = '<i class="fas fa-robot"></i> Скоринг заявки №' + appId;
+    if (subEl) subEl.textContent = app ? app.client : 'Клиент';
+
     renderSSteps();
     updateSProgress();
     updateSDetail(0);
@@ -60,8 +69,10 @@ function runSStep(idx, delays) {
     
     var step = sSteps[idx];
     var hasIssue = false;
+    // Демо-режим: полный скоринг всегда зелёный (негатив — в scoring_negative.html)
+    var DEMO_SCORING_GREEN = true;
     
-    if (step.issues && step.issues.length > 0) {
+    if (!DEMO_SCORING_GREEN && step.issues && step.issues.length > 0) {
         var totalProb = 0;
         step.issues.forEach(function(iss) { totalProb += iss.prob; });
         var roll = Math.random() * 100;
@@ -155,14 +166,18 @@ function applyManagerScoringDecision(outcome) {
     if (!app) return;
 
     if (outcome === 'approved') {
-        var rate = 12.5;
-        var payment = Math.round(app.amount * (rate / 100) / 12 / (1 - Math.pow(1 + (rate / 100) / 12, -app.term * 12)));
+        var rate = (app.rate != null) ? app.rate : 12.5;
+        var amount = app.amount || 5000000;
+        var term = app.term || 15;
+        var payment = (typeof calculatePayment === 'function')
+            ? calculatePayment(amount, rate, term)
+            : Math.round(amount * (rate / 100) / 12 / (1 - Math.pow(1 + (rate / 100) / 12, -term * 12)));
         if (typeof updateApplication === 'function') {
-            updateApplication(appId, { rate: rate, payment: payment });
+            updateApplication(appId, { rate: rate, payment: payment, amount: amount, term: term });
         }
         updateApplicationStatus(appId, 'approved', 'Одобрено', 'Полный скоринг завершён: кредит одобрен');
         if (typeof sendChatMessage === 'function') {
-            sendChatMessage('manager', app.client, 'Поздравляю! По заявке №' + appId + ' полный скоринг завершён — кредит одобрен.', app.client);
+            sendChatMessage('manager', app.client, 'Поздравляю! По заявке №' + appId + ' полный скоринг завершён — кредит одобрен (ставка ' + rate + '%, платёж ~' + payment.toLocaleString('ru-RU') + ' ₽).', app.client);
         }
     } else {
         updateApplicationStatus(appId, 'rejected', 'Отказ', 'Полный скоринг: в кредите отказано');
@@ -238,7 +253,13 @@ function showSResult(outcome) {
     
     if (outcome === 'approved') {
         document.getElementById('sResultSubtitle').textContent = 'Заявка одобрена';
-        h += '<div class="s-result approved"><div class="r-icon">✅</div><div class="r-title" style="color:#065f46;">Кредит одобрен</div><div class="r-desc">Все проверки пройдены. Статус заявки обновлён.</div><div class="r-params"><div class="r-param"><div class="r-label">Лимит</div><div class="r-value" style="color:#003b6f;">5 400 000 ₽</div></div><div class="r-param"><div class="r-label">Ставка</div><div class="r-value" style="color:#10b981;">12.5%</div></div><div class="r-param"><div class="r-label">Срок</div><div class="r-value">15 лет</div></div><div class="r-param"><div class="r-label">Платёж</div><div class="r-value">~ 54 000 ₽</div></div></div><div class="s-btn-row"><button class="s-btn s-btn-success" onclick="confirmManagerScoringDecision(\'approved\')"><i class="fas fa-check"></i> Готово</button><button class="s-btn s-btn-outline" onclick="closeManagerScoring()"><i class="fas fa-times"></i> Закрыть</button></div></div>';
+        var apps2 = typeof getAllApplications === 'function' ? getAllApplications() : [];
+        var app2 = apps2.find(function(a) { return a.id === selectedAppId; }) || {};
+        var lim = (app2.amount || 5400000).toLocaleString('ru-RU') + ' ₽';
+        var rt = (app2.rate != null ? app2.rate : 12.5) + '%';
+        var tm = (app2.term || 15) + ' лет';
+        var pay = '~ ' + (app2.payment != null ? app2.payment : 0).toLocaleString('ru-RU') + ' ₽';
+        h += '<div class="s-result approved"><div class="r-icon">✅</div><div class="r-title" style="color:#065f46;">Кредит одобрен</div><div class="r-desc">Все проверки пройдены. Статус заявки обновлён.</div><div class="r-params"><div class="r-param"><div class="r-label">Лимит</div><div class="r-value" style="color:#003b6f;">' + lim + '</div></div><div class="r-param"><div class="r-label">Ставка</div><div class="r-value" style="color:#10b981;">' + rt + '</div></div><div class="r-param"><div class="r-label">Срок</div><div class="r-value">' + tm + '</div></div><div class="r-param"><div class="r-label">Платёж</div><div class="r-value">' + pay + '</div></div></div><div class="s-btn-row"><button class="s-btn s-btn-success" onclick="confirmManagerScoringDecision(\'approved\')"><i class="fas fa-check"></i> Готово</button><button class="s-btn s-btn-outline" onclick="closeManagerScoring()"><i class="fas fa-times"></i> Закрыть</button></div></div>';
     } else {
         document.getElementById('sResultSubtitle').textContent = 'Заявка отклонена';
         h += '<div class="s-result rejected"><div class="r-icon">❌</div><div class="r-title" style="color:#991b1b;">В кредите отказано</div><div class="r-desc">Обнаружены стоп-факторы. Статус заявки обновлён.</div><div class="s-btn-row"><button class="s-btn s-btn-danger" onclick="confirmManagerScoringDecision(\'rejected\')"><i class="fas fa-times"></i> Готово</button><button class="s-btn s-btn-outline" onclick="closeManagerScoring()"><i class="fas fa-comment-dots"></i> Закрыть</button></div></div>';

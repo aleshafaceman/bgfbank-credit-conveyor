@@ -37,6 +37,7 @@ function navigateTo(page) {
             document.getElementById('view-dashboard').classList.remove('hidden');
             document.getElementById('pageTitle').innerText = 'Панель управления';
             document.getElementById('pageSubtitle').innerText = 'Сводка по вашим активностям';
+            if (typeof refreshDashboard === 'function') refreshDashboard();
             break;
         case 'applications':
             document.getElementById('view-applications').classList.remove('hidden');

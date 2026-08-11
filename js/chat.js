@@ -1,50 +1,74 @@
 // ========== ЧАТ С МЕНЕДЖЕРОМ ==========
-// Виджет чата в правом нижнем углу
+// Виджет чата в правом нижнем углу — общая база shared/data.js
+
+function getClientChatName() {
+    if (typeof getClientDisplayName === 'function') return getClientDisplayName();
+    if (typeof getUserCredentials === 'function') {
+        var u = getUserCredentials();
+        if (u && u.name) return u.name;
+    }
+    return 'Александр Кузнецов';
+}
+
+function renderClientChat() {
+    var body = document.getElementById('chatBody');
+    if (!body) return;
+    if (typeof loadSharedData === 'function') loadSharedData();
+
+    var name = getClientChatName();
+    var history = typeof getChatHistory === 'function' ? getChatHistory(name) : [];
+
+    if (!history.length) {
+        body.innerHTML = '<div class="chat-system">Напишите менеджеру — переписка синхронизируется с панелью банка</div>';
+    } else {
+        body.innerHTML = history.map(function(m) {
+            var cls = m.from === 'client' ? 'client' : 'manager';
+            return '<div class="chat-message ' + cls + '">' + m.text +
+                '<div class="msg-time">' + (m.time || '') + '</div></div>';
+        }).join('');
+    }
+    body.scrollTop = body.scrollHeight;
+
+    var unread = history.filter(function(m) { return m.from === 'manager' && !m.read; }).length;
+    var toggle = document.getElementById('chatToggle');
+    if (toggle) {
+        if (unread > 0 && document.getElementById('chatWindow').classList.contains('hidden')) {
+            toggle.classList.add('has-unread');
+        } else {
+            toggle.classList.remove('has-unread');
+        }
+    }
+
+    var statusEl = document.getElementById('chatOnlineStatus');
+    if (statusEl) statusEl.classList.remove('offline');
+}
 
 function toggleChat() {
-    const w = document.getElementById('chatWindow');
-    const t = document.getElementById('chatToggle');
+    var w = document.getElementById('chatWindow');
+    var t = document.getElementById('chatToggle');
     w.classList.toggle('hidden');
-    t.classList.remove('has-unread');
     if (!w.classList.contains('hidden')) {
-        document.getElementById('chatInput').focus();
-        document.getElementById('chatBody').scrollTop = document.getElementById('chatBody').scrollHeight;
+        var name = getClientChatName();
+        if (typeof markMessagesAsRead === 'function') markMessagesAsRead(name);
+        renderClientChat();
+        if (t) t.classList.remove('has-unread');
+        var input = document.getElementById('chatInput');
+        if (input) input.focus();
     }
 }
 
 function sendMessage() {
-    const input = document.getElementById('chatInput');
-    const text = input.value.trim();
+    var input = document.getElementById('chatInput');
+    if (!input) return;
+    var text = input.value.trim();
     if (!text) return;
-    
-    const body = document.getElementById('chatBody');
-    const now = new Date();
-    const time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    
-    body.innerHTML += `<div class="chat-message client">${text}<div class="msg-time">${time}</div></div>`;
+
+    var name = getClientChatName();
+    if (typeof sendChatMessage === 'function') {
+        sendChatMessage('client', name, text, name);
+    }
     input.value = '';
-    body.scrollTop = body.scrollHeight;
-    
-    // Имитация ответа менеджера
-    setTimeout(() => {
-        const typing = document.createElement('div');
-        typing.className = 'typing-indicator';
-        typing.innerHTML = '<span></span><span></span><span></span>';
-        body.appendChild(typing);
-        body.scrollTop = body.scrollHeight;
-        
-        setTimeout(() => {
-            typing.remove();
-            const replies = [
-                'Спасибо за информацию! Я проверю и вернусь к вам.',
-                'Принято! Если понадобится что-то ещё — напишите.',
-                'Отлично, я зафиксировала. Хорошего дня!',
-                'Поняла вас. Как только будет обновление — сразу сообщу.'
-            ];
-            body.innerHTML += `<div class="chat-message manager">${replies[Math.floor(Math.random() * replies.length)]}<div class="msg-time">${time}</div></div>`;
-            body.scrollTop = body.scrollHeight;
-        }, 1500);
-    }, 800);
+    renderClientChat();
 }
 
 function sendQuickReply(text) {
@@ -52,10 +76,6 @@ function sendQuickReply(text) {
     sendMessage();
 }
 
-// Инициализация статуса менеджера
 document.addEventListener('DOMContentLoaded', function() {
-    const statusEl = document.getElementById('chatOnlineStatus');
-    if (statusEl) {
-        statusEl.classList.add(Math.random() > 0.3 ? '' : 'offline');
-    }
+    renderClientChat();
 });

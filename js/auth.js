@@ -160,7 +160,8 @@ function loginViaESIA() {
 function registerViaESIA() {
     const name = 'Александр Кузнецов';
     const phone = '+7 (999) 123-45-67';
-    registerUser(phone, 'esia' + Date.now(), name);
+    // Демо: сохраняем известный пароль, иначе повторный вход ломается
+    registerUser(phone, 'password123', name);
     document.getElementById('authWelcomeName').textContent = name;
     switchAuthView('regsuccess');
 }
@@ -183,6 +184,15 @@ function enterApp() {
     if (typeof loadSharedData === 'function') loadSharedData();
     if (typeof refreshClientApplicationsUI === 'function') {
         refreshClientApplicationsUI(typeof pickPreferredClientAppId === 'function' ? pickPreferredClientAppId() : (state.selectedApp || '4421-И'));
+    }
+    if (typeof refreshDashboard === 'function') refreshDashboard();
+    if (typeof renderClientChat === 'function') renderClientChat();
+    if (typeof initSharedDataSync === 'function') {
+        initSharedDataSync(function() {
+            if (typeof refreshClientApplicationsUI === 'function') refreshClientApplicationsUI(state.selectedApp);
+            if (typeof renderClientChat === 'function') renderClientChat();
+            if (typeof refreshDashboard === 'function') refreshDashboard();
+        });
     }
 }
 
