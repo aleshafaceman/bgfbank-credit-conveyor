@@ -41,12 +41,40 @@ function onCollateralSelect(v) {
     bm.disabled = false;
 }
 
-function openConveyorFromApplications() {
-    state.conveyorAppId = state.selectedApp || state.conveyorAppId || '4421-И';
+function openConveyorForApp(appId) {
+    state.conveyorAppId = appId;
+    state.selectedApp = appId;
     document.getElementById('view-applications').classList.add('hidden');
+    document.getElementById('view-dashboard').classList.add('hidden');
     document.getElementById('view-conveyor').classList.remove('hidden');
+    document.getElementById('pageTitle').innerText = 'Оформление заявки';
+    document.getElementById('pageSubtitle').innerText = 'Заявка №' + appId;
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const appsNav = document.querySelectorAll('.nav-link')[1];
+    if (appsNav) appsNav.classList.add('active');
+    state.currentPage = 'applications';
     populateCollateralSelect();
     resetConveyor();
+}
+
+function ensureConveyorApplication() {
+    if (typeof loadSharedData === 'function') loadSharedData();
+    const apps = typeof getAllApplications === 'function' ? getAllApplications() : [];
+    let appId = state.selectedApp || state.conveyorAppId;
+    let app = apps.find(a => a.id === appId);
+
+    if (!app || app.status === 'approved' || app.status === 'rejected') {
+        const active = typeof getActiveClientApplications === 'function' ? getActiveClientApplications() : [];
+        if (active[0]) return active[0].id;
+        const created = createNewClientApplication({ openConveyor: false, refresh: true });
+        return created ? created.id : appId;
+    }
+    return app.id;
+}
+
+function openConveyorFromApplications() {
+    const appId = ensureConveyorApplication();
+    openConveyorForApp(appId);
 }
 
 function resetConveyor() {

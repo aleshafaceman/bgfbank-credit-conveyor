@@ -182,7 +182,7 @@ function enterApp() {
     init2FAToggle();
     if (typeof loadSharedData === 'function') loadSharedData();
     if (typeof refreshClientApplicationsUI === 'function') {
-        refreshClientApplicationsUI(state.selectedApp || '4421-И');
+        refreshClientApplicationsUI(typeof pickPreferredClientAppId === 'function' ? pickPreferredClientAppId() : (state.selectedApp || '4421-И'));
     }
 }
 
