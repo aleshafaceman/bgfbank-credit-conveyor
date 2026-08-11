@@ -76,8 +76,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Показываем заявки из общей базы
     if (typeof loadSharedData === 'function') loadSharedData();
     if (typeof renderApplicationsList === 'function') renderApplicationsList();
-    const preferred = (typeof getClientApplications === 'function' && getClientApplications().some(a => a.id === '4421-И'))
-        ? '4421-И'
-        : (typeof getClientApplications === 'function' && getClientApplications()[0] && getClientApplications()[0].id);
+    const preferred = (typeof pickPreferredClientAppId === 'function')
+        ? pickPreferredClientAppId('4421-И')
+        : '4421-И';
     if (preferred) selectApplication(preferred);
 });

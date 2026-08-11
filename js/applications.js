@@ -68,17 +68,103 @@ function getStepperHTML(status) {
     return h;
 }
 
+function getActiveClientApplications() {
+    return getClientApplications().filter(a => a.status !== 'approved' && a.status !== 'rejected');
+}
+
+function pickPreferredClientAppId(preferredAppId) {
+    const apps = getClientApplications();
+    const active = getActiveClientApplications();
+    const preferred = preferredAppId || state.selectedApp;
+
+    if (preferred && active.some(a => a.id === preferred)) return preferred;
+    if (active[0]) return active[0].id;
+    if (preferred && apps.some(a => a.id === preferred)) return preferred;
+    return apps[0] && apps[0].id;
+}
+
+function createNewClientApplication(opts) {
+    opts = opts || {};
+    if (typeof addApplication !== 'function') {
+        alert('Не удалось создать заявку: общая база недоступна');
+        return null;
+    }
+
+    const user = typeof getUserCredentials === 'function' ? getUserCredentials() : {};
+    const name = getClientDisplayName();
+    const prop = (typeof propertyPortfolio !== 'undefined' && propertyPortfolio[0]) ? propertyPortfolio[0] : null;
+
+    const newApp = addApplication({
+        client: name,
+        phone: user.phone || '+7 (999) 123-45-67',
+        product: 'Кредит под залог недвижимости',
+        amount: state.desiredAmount || 5000000,
+        term: state.desiredTerm || 15,
+        status: 'new',
+        statusLabel: 'Новая',
+        collateralAddress: prop ? prop.address : 'г. Москва, ул. Крылатская, д. 15, кв. 42',
+        collateralValue: (prop && prop.valuation) ? prop.valuation : 8500000,
+        preApprovedPackageId: 'PKG_RECOMMENDED',
+        packageStatus: 'proposed',
+        documents: [
+            { name: 'Справка 2-НДФЛ', status: 'missing', statusLabel: 'Не загружен' },
+            { name: 'Паспорт (разворот)', status: 'uploaded', statusLabel: 'Загружен' },
+            { name: 'Выписка ЕГРН', status: 'missing', statusLabel: 'Не загружен' }
+        ]
+    });
+
+    state.selectedApp = newApp.id;
+    state.conveyorAppId = newApp.id;
+
+    if (opts.refresh !== false) refreshClientApplicationsUI(newApp.id);
+    if (opts.openConveyor) openConveyorForApp(newApp.id);
+    return newApp;
+}
+
+function startNewApplicationDemo() {
+    createNewClientApplication({ openConveyor: true, refresh: true });
+}
+
+function continueOrStartApplication() {
+    const active = getActiveClientApplications();
+    if (active[0]) {
+        state.selectedApp = active[0].id;
+        navigateTo('applications');
+        openConveyorForApp(active[0].id);
+        return;
+    }
+    startNewApplicationDemo();
+}
+
+function resetDemoData() {
+    if (!confirm('Сбросить демо-данные заявок и чата?\n\nСтатусы вернутся к исходному состоянию. Учётка входа сохранится.')) return;
+    try {
+        localStorage.removeItem('bgfbank_applications');
+        localStorage.removeItem('bgfbank_clients');
+        localStorage.removeItem('bgfbank_messages');
+    } catch (e) {}
+    location.reload();
+}
+
 function renderApplicationsList() {
     const list = document.getElementById('applicationsList');
     if (!list) return;
 
     const apps = getClientApplications();
+    const toolbar =
+        '<div class="applications-toolbar">' +
+            '<div class="applications-toolbar-title">Мои заявки</div>' +
+            '<button type="button" class="btn-new-app" onclick="startNewApplicationDemo()"><i class="fas fa-plus"></i> Новая заявка</button>' +
+        '</div>';
+
     if (!apps.length) {
-        list.innerHTML = '<div class="detail-empty" style="padding:24px;"><i class="fas fa-file-alt"></i><p>Нет заявок</p></div>';
+        list.innerHTML = toolbar +
+            '<div class="detail-empty" style="padding:24px;"><i class="fas fa-file-alt"></i><p>Нет заявок</p>' +
+            '<button type="button" class="btn btn-primary" style="margin-top:16px;max-width:220px;" onclick="startNewApplicationDemo()">Создать заявку</button></div>';
         return;
     }
 
-    list.innerHTML = apps.map(function(app) {
+    list.innerHTML = toolbar + apps.map(function(app) {
         const meta = getAppStatusMeta(app.status, app.statusLabel);
         const active = app.id === state.selectedApp ? ' active-card' : '';
         return '<div class="application-card' + active + '" onclick="selectApplication(\'' + app.id + '\')" data-app="' + app.id + '">' +
@@ -90,23 +176,23 @@ function renderApplicationsList() {
 
     const badge = document.querySelector('.nav-link .badge');
     if (badge) {
-        const activeCount = apps.filter(a => a.status !== 'approved' && a.status !== 'rejected').length;
+        const activeCount = getActiveClientApplications().length;
         badge.textContent = String(activeCount);
         badge.style.display = activeCount ? '' : 'none';
     }
 }
 
 function refreshClientApplicationsUI(preferredAppId) {
-    const apps = getClientApplications();
-    const preferred = preferredAppId || state.selectedApp;
-    const stillExists = apps.some(a => a.id === preferred);
-    const nextId = stillExists ? preferred : (apps[0] && apps[0].id);
+    const nextId = pickPreferredClientAppId(preferredAppId);
 
     renderApplicationsList();
     if (nextId) selectApplication(nextId);
     else {
         const c = document.getElementById('applicationDetail');
-        if (c) c.innerHTML = '<div class="detail-empty"><i class="fas fa-file-alt"></i><p>Выберите заявку</p></div>';
+        if (c) {
+            c.innerHTML = '<div class="detail-empty"><i class="fas fa-file-alt"></i><p>Нет выбранной заявки</p>' +
+                '<button type="button" class="btn btn-primary" style="margin-top:16px;max-width:220px;" onclick="startNewApplicationDemo()">Создать заявку</button></div>';
+        }
     }
 }
 
@@ -239,14 +325,17 @@ function getApprovedApplicationHTML(app) {
     return `<div class="detail-header"><div><div class="detail-number">№${app.id}</div><div class="detail-product">${app.product || 'Кредит под залог недвижимости'}</div></div><div class="detail-date">Одобрена: ${app.date || ''}</div></div>
     <div class="approved-badge"><i class="fas fa-check-circle"></i> Кредит одобрен</div>
     <div class="detail-params"><div class="detail-param"><div class="param-label">Одобренный лимит</div><div class="param-value">${amount}</div></div><div class="detail-param"><div class="param-label">Ставка</div><div class="param-value" style="color:#10b981;">${rate}</div></div><div class="detail-param"><div class="param-label">Срок</div><div class="param-value">${term}</div></div><div class="detail-param"><div class="param-label">Платёж / мес.</div><div class="param-value">${payment}</div></div></div>
-    <div style="display:flex;gap:12px;margin-top:24px;"><button class="btn btn-primary" style="flex:1;" onclick="alert('Переход к подписанию договора...')"><i class="fas fa-signature" style="margin-right:8px;"></i> Подписать договор</button></div>`;
+    <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;">
+        <button class="btn btn-primary" style="flex:1;min-width:180px;" onclick="alert('Переход к подписанию договора...')"><i class="fas fa-signature" style="margin-right:8px;"></i> Подписать договор</button>
+        <button class="btn btn-outline" style="flex:1;min-width:180px;margin-top:0;" onclick="startNewApplicationDemo()"><i class="fas fa-plus" style="margin-right:8px;"></i> Новая заявка</button>
+    </div>`;
 }
 
 function getRejectedApplicationHTML(app) {
     const reason = (app.history && app.history[0] && app.history[0].text) || 'Недостаточный уровень подтверждённого дохода.';
     return `<div class="detail-header"><div><div class="detail-number">№${app.id}</div><div class="detail-product">${app.product || 'Кредит под залог недвижимости'}</div></div></div>
     <div class="rejection-reason"><h4><i class="fas fa-times-circle"></i> Причина отказа</h4><p>${reason}</p></div>
-    <button class="btn btn-primary" onclick="navigateTo('applications');selectApplication('4421-И');">К активной заявке</button>`;
+    <button class="btn btn-primary" onclick="startNewApplicationDemo()"><i class="fas fa-plus" style="margin-right:8px;"></i> Подать новую заявку</button>`;
 }
 
 // ========== ДОПОЛНИТЕЛЬНЫЕ УСЛОВИЯ (ДУ) ДЛЯ КЛИЕНТА ==========
