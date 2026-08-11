@@ -116,7 +116,6 @@ function loadSharedData() {
             { id: 'msg3', from: 'manager', to: 'Александр Кузнецов', text: 'Для подтверждения дохода подойдёт справка 2-НДФЛ за последние 6 месяцев или справка по форме банка.', time: '14:19', date: '15.06.2026', read: true },
             { id: 'msg4', from: 'client', to: 'Александр Кузнецов', text: 'Понял, спасибо! Загружу 2-НДФЛ сегодня вечером.', time: '14:21', date: '15.06.2026', read: true },
             { id: 'msg5', from: 'manager', to: 'Александр Кузнецов', text: 'Отлично! Как загрузите — дайте знать, я сразу проверю и запущу прескоринг.', time: '14:22', date: '15.06.2026', read: true },
-            { id: 'msg6', from: 'manager', to: 'Мария Петрова', text: 'Мария, здравствуйте! Это Елена Смирнова, кредитный менеджер БЖФ Банка. Вижу вашу заявку №4450-И. Для продолжения потребуется загрузить справку 2-НДФЛ.', time: '10:05', date: '16.06.2026', read: false },
             { id: 'msg7', from: 'manager', to: 'Сергей Волков', text: 'Сергей, добрый день! Ваша заявка №4460-И принята в обработку. Все документы проверены, запускаю прескоринг.', time: '11:30', date: '16.06.2026', read: false }
         ];
         saveMessagesData();
@@ -172,10 +171,53 @@ function buildClientsFromApplications() {
 }
 
 // ========== СОХРАНЕНИЕ ==========
-function saveSharedData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(sharedApplications)); }
-function saveClientsData() { localStorage.setItem(CLIENTS_KEY, JSON.stringify(sharedClients)); }
-function saveMessagesData() { localStorage.setItem(MESSAGES_KEY, JSON.stringify(sharedMessages)); }
-function saveUserData() { localStorage.setItem(USER_KEY, JSON.stringify(userCredentials)); }
+function bumpSharedSync(kind) {
+    try {
+        localStorage.setItem('bgfbank_sync_ping', JSON.stringify({ t: Date.now(), kind: kind || 'data' }));
+    } catch (e) {}
+}
+
+function saveSharedData() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sharedApplications));
+    bumpSharedSync('applications');
+}
+function saveClientsData() {
+    localStorage.setItem(CLIENTS_KEY, JSON.stringify(sharedClients));
+    bumpSharedSync('clients');
+}
+function saveMessagesData() {
+    localStorage.setItem(MESSAGES_KEY, JSON.stringify(sharedMessages));
+    bumpSharedSync('messages');
+}
+function saveUserData() {
+    localStorage.setItem(USER_KEY, JSON.stringify(userCredentials));
+    bumpSharedSync('user');
+}
+
+function initSharedDataSync(handler) {
+    if (window.__bgfSharedSyncBound) return;
+    window.__bgfSharedSyncBound = true;
+    window.addEventListener('storage', function(e) {
+        if (!e.key) return;
+        if (e.key !== STORAGE_KEY && e.key !== CLIENTS_KEY && e.key !== MESSAGES_KEY && e.key !== USER_KEY && e.key !== 'bgfbank_sync_ping') {
+            return;
+        }
+        try { loadSharedData(); } catch (err) {}
+        if (typeof handler === 'function') handler(e.key);
+        if (typeof window.onSharedDataUpdated === 'function') window.onSharedDataUpdated(e.key);
+    });
+}
+
+function resetDemoStorage(options) {
+    options = options || {};
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(CLIENTS_KEY);
+        localStorage.removeItem(MESSAGES_KEY);
+        if (options.includeUser) localStorage.removeItem(USER_KEY);
+        bumpSharedSync('reset');
+    } catch (e) {}
+}
 
 // ========== API ЗАЯВКИ ==========
 function addApplication(app) {

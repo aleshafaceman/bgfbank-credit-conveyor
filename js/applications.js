@@ -137,13 +137,55 @@ function continueOrStartApplication() {
 }
 
 function resetDemoData() {
-    if (!confirm('Сбросить демо-данные заявок и чата?\n\nСтатусы вернутся к исходному состоянию. Учётка входа сохранится.')) return;
-    try {
-        localStorage.removeItem('bgfbank_applications');
-        localStorage.removeItem('bgfbank_clients');
-        localStorage.removeItem('bgfbank_messages');
-    } catch (e) {}
+    if (!confirm('Сбросить демо-данные заявок и чата?\n\nСтатусы вернутся к исходному состоянию. Логин/пароль демо сохранятся.')) return;
+    if (typeof resetDemoStorage === 'function') {
+        resetDemoStorage({ includeUser: false });
+    } else {
+        try {
+            localStorage.removeItem('bgfbank_applications');
+            localStorage.removeItem('bgfbank_clients');
+            localStorage.removeItem('bgfbank_messages');
+        } catch (e) {}
+    }
     location.reload();
+}
+
+function refreshDashboard() {
+    const view = document.getElementById('view-dashboard');
+    if (!view) return;
+    if (typeof loadSharedData === 'function') loadSharedData();
+
+    const active = typeof getActiveClientApplications === 'function' ? getActiveClientApplications() : [];
+    const app = active[0] || (typeof getClientApplications === 'function' ? getClientApplications()[0] : null);
+    const name = (typeof getClientDisplayName === 'function' ? getClientDisplayName() : 'Александр').split(' ')[0];
+
+    const bannerTitle = view.querySelector('.welcome-banner h2');
+    const bannerText = view.querySelector('.welcome-banner p');
+    if (bannerTitle) bannerTitle.textContent = 'Добрый день, ' + name + '!';
+    if (bannerText) {
+        bannerText.textContent = app
+            ? (active.length ? 'У вас активная заявка на кредит под залог недвижимости' : 'Последняя заявка: №' + app.id + ' · ' + (app.statusLabel || ''))
+            : 'Создайте заявку, чтобы начать оформление';
+    }
+
+    const statusSpan = view.querySelector('.dashboard-card .app-status');
+    const idSpan = view.querySelector('.dashboard-card span[style*="font-weight: 700"]');
+    if (app) {
+        const meta = typeof getAppStatusMeta === 'function' ? getAppStatusMeta(app.status, app.statusLabel) : { cls: 'status-active', icon: 'fas fa-sync-alt', label: app.statusLabel || '' };
+        if (statusSpan) {
+            statusSpan.className = 'app-status ' + meta.cls;
+            statusSpan.innerHTML = '<i class="' + meta.icon + '" style="font-size: 10px;"></i> ' + meta.label;
+        }
+        if (idSpan) idSpan.textContent = '№' + app.id;
+    }
+
+    const notif = view.querySelector('.notif-time');
+    if (notif && app) {
+        const first = view.querySelector('.notification-item .notif-time');
+        if (first && first.textContent.indexOf('заявки') !== -1) {
+            first.textContent = 'Требуется для заявки №' + app.id;
+        }
+    }
 }
 
 function renderApplicationsList() {

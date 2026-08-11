@@ -35,9 +35,16 @@ function managerAction(appId, action) {
                     : (typeof managerApplications !== 'undefined' ? managerApplications : [])
                 ).find(a => a.id === appId);
                 if (updatedApp) {
-                    const rate = 12.5;
-                    const payment = Math.round(updatedApp.amount * (rate / 100) / 12 / (1 - Math.pow(1 + (rate / 100) / 12, -updatedApp.term * 12)));
-                    updateApplication(appId, { rate, payment });
+                    // Не затираем принятый клиентом пакет: ставка/платёж только если ещё нет
+                    const rate = updatedApp.rate != null ? updatedApp.rate : 12.5;
+                    const payment = updatedApp.payment != null
+                        ? updatedApp.payment
+                        : (typeof calculatePayment === 'function'
+                            ? calculatePayment(updatedApp.amount, rate, updatedApp.term)
+                            : Math.round(updatedApp.amount * (rate / 100) / 12 / (1 - Math.pow(1 + (rate / 100) / 12, -updatedApp.term * 12))));
+                    if (updatedApp.rate == null || updatedApp.payment == null) {
+                        updateApplication(appId, { rate, payment });
+                    }
                     updateApplicationStatus(appId, 'decision', 'Решение', 'Прескоринг завершён. Ставка: ' + rate + '%');
                     sendChatMessage('manager', app.client, 'Прескоринг завершён! Ставка: ' + rate + '%, платёж: ~' + payment.toLocaleString('ru-RU') + ' ₽.', app.client);
                 }
@@ -50,7 +57,7 @@ function managerAction(appId, action) {
             
         case 'requestValuation':
             const ov = app.collateralValue;
-            const nv = Math.round(app.collateralValue * (0.93 + Math.random() * 0.14));
+            const nv = Math.round(app.collateralValue * 1.02);
             updateApplication(appId, { collateralValue: nv });
             updateApplicationStatus(appId, app.status, app.statusLabel, `Оценка Ocenka.mobi: ${nv.toLocaleString('ru-RU')} ₽`);
             sendChatMessage('manager', app.client, 'Обновлена оценка недвижимости: ' + nv.toLocaleString('ru-RU') + ' ₽.', app.client);

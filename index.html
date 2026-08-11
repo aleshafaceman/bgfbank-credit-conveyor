@@ -313,13 +313,7 @@
     <button class="chat-toggle has-unread" id="chatToggle" onclick="toggleChat()"><i class="fas fa-comment-dots"></i></button>
     <div class="chat-window hidden" id="chatWindow">
         <div class="chat-header"><div class="chat-avatar">ЕС</div><div><div class="chat-title">Елена Смирнова</div><div class="chat-subtitle">Кредитный менеджер</div></div><div class="chat-status" id="chatOnlineStatus"></div><button class="chat-close" onclick="toggleChat()"><i class="fas fa-times"></i></button></div>
-        <div class="chat-body" id="chatBody">
-            <div class="chat-system">Сегодня, 14:15</div>
-            <div class="chat-message manager">Александр, добрый день! Я ваш кредитный менеджер. Нужна помощь с заявкой?<div class="msg-time">14:15</div></div>
-            <div class="chat-message client">Здравствуйте! Какие документы нужны для подтверждения дохода?<div class="msg-time">14:18</div></div>
-            <div class="chat-message manager">Подойдёт 2-НДФЛ за 6 месяцев или справка по форме банка.<div class="msg-time">14:19</div></div>
-        </div>
-        <div class="chat-footer"><button class="chat-attach" onclick="alert('Выберите файл...')"><i class="fas fa-paperclip"></i></button><input type="text" id="chatInput" placeholder="Введите сообщение..." onkeydown="if(event.key==='Enter')sendMessage()"><button class="chat-send" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button></div>
+        <div class="chat-body" id="chatBody"></div><div class="chat-footer"><button class="chat-attach" onclick="alert('Выберите файл...')"><i class="fas fa-paperclip"></i></button><input type="text" id="chatInput" placeholder="Введите сообщение..." onkeydown="if(event.key==='Enter')sendMessage()"><button class="chat-send" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button></div>
     </div>
 </div>
 

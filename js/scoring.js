@@ -1,5 +1,20 @@
 // ========== ПОЛНЫЙ СКОРИНГ ==========
 
+function getScoringOfferSnapshot() {
+    var appId = (typeof state !== 'undefined' && (state.selectedApp || state.conveyorAppId)) || '4421-И';
+    var apps = typeof getAllApplications === 'function' ? getAllApplications() : [];
+    var app = apps.find(function(a) { return a.id === appId; }) || {};
+
+    var amount = (typeof state !== 'undefined' && state.currentLimit) ? state.currentLimit : (app.amount || 5400000);
+    var rate = (typeof state !== 'undefined' && state.currentRate) ? state.currentRate : (app.rate != null ? app.rate : 12.5);
+    var term = (typeof state !== 'undefined' && state.currentTerm) ? state.currentTerm : (app.term || 15);
+    var payment = (typeof calculatePayment === 'function')
+        ? calculatePayment(amount, rate, term)
+        : (app.payment != null ? app.payment : 0);
+
+    return { appId: appId, amount: amount, rate: rate, term: term, payment: payment, app: app };
+}
+
 var scoringSteps = [
     { name: 'Кредитная история (НБКИ)', source: 'НБКИ', time: '1.2 сек', detail: 'Кредитный рейтинг: 720. Просрочек нет. 2 действующих кредита.' },
     { name: 'Кредитная история (ОКБ)', source: 'ОКБ', time: '0.8 сек', detail: 'Данные совпадают. Расхождений не обнаружено.' },
@@ -7,7 +22,7 @@ var scoringSteps = [
     { name: 'Проверка работодателя', source: 'ЕГРЮЛ / ФНС', time: '1.5 сек', detail: 'ООО «ТехноСофт» действует с 2010 г. Банкротств не зафиксировано.' },
     { name: 'Оценка недвижимости', source: 'Ocenka.mobi', time: '2.8 сек', detail: 'Рыночная стоимость: 8 500 000 ₽. Ликвидность: высокая. Рекомендуемый LTV: 60%.' },
     { name: 'Андеррайтинг', source: 'Loginom', time: '3.2 сек', detail: 'PTI: 38% (норма). DTI: 42% (норма). Стоп-факторы отсутствуют.' },
-    { name: 'Расчёт итоговых условий', source: 'Внутренний', time: '1.0 сек', detail: 'Ставка: 12.5%. Лимит: 5 400 000 ₽. Платёж: ~54 000 ₽/мес.' },
+    { name: 'Расчёт итоговых условий', source: 'Внутренний', time: '1.0 сек', detail: 'Итоговые условия рассчитаны по выбранному пакету.' },
     { name: 'Формирование решения', source: 'Внутренний', time: '0.8 сек', detail: 'Решение: ОДОБРЕНО. Оффер сформирован.' }
 ];
 
@@ -17,6 +32,11 @@ var scoringTimer = null;
 function openFullScoring() {
     document.getElementById('view-result').classList.add('hidden');
     document.getElementById('scoringOverlay').classList.remove('hidden');
+
+    var snap = getScoringOfferSnapshot();
+    var title = document.querySelector('#scoringOverlay h2');
+    if (title) title.textContent = 'Идёт полный скоринг заявки №' + snap.appId;
+    scoringSteps[6].detail = 'Ставка: ' + snap.rate + '%. Лимит: ' + snap.amount.toLocaleString('ru-RU') + ' ₽. Платёж: ~' + snap.payment.toLocaleString('ru-RU') + ' ₽/мес.';
     
     scoringCurrentStep = 0;
     renderScoringSteps();
@@ -94,13 +114,13 @@ function updateScoringDetail(idx) {
     }
 }
 
-function applyClientScoringDecision(outcome) {
-    var appId = (typeof state !== 'undefined' && (state.selectedApp || state.conveyorAppId)) || '4421-И';
+function applyClientScoringDecision(outcome, snap) {
+    var appId = snap.appId;
     if (typeof updateApplicationStatus !== 'function') return;
 
     if (outcome === 'approved') {
         if (typeof updateApplication === 'function') {
-            updateApplication(appId, { rate: 12.5, payment: 54000, amount: 5400000 });
+            updateApplication(appId, { rate: snap.rate, payment: snap.payment, amount: snap.amount, term: snap.term });
         }
         updateApplicationStatus(appId, 'approved', 'Одобрено', 'Полный скоринг завершён: кредит одобрен');
         if (typeof state !== 'undefined') state.selectedApp = appId;
@@ -110,20 +130,21 @@ function applyClientScoringDecision(outcome) {
 }
 
 function showScoringResult() {
-    // Демо-сценарий: чекпоинты успешные → итог всегда одобрение
     var outcome = 'approved';
-    applyClientScoringDecision(outcome);
+    var snap = getScoringOfferSnapshot();
+    applyClientScoringDecision(outcome, snap);
 
+    var termLabel = (typeof getTermLabel === 'function') ? getTermLabel(snap.term) : 'лет';
     var h = '';
     h += '<div class="scoring-result approved">';
     h += '<div class="r-icon">✅</div>';
     h += '<div class="r-title" style="color:#065f46;">Кредит одобрен</div>';
     h += '<div class="r-desc">Все проверки пройдены успешно. Кредитный рейтинг 720 (хороший).</div>';
     h += '<div class="r-params">';
-    h += '<div class="r-param"><div class="r-label">Лимит</div><div class="r-value" style="color:#003b6f;">5 400 000 ₽</div></div>';
-    h += '<div class="r-param"><div class="r-label">Ставка</div><div class="r-value" style="color:#10b981;">12.5%</div></div>';
-    h += '<div class="r-param"><div class="r-label">Срок</div><div class="r-value">15 лет</div></div>';
-    h += '<div class="r-param"><div class="r-label">Платёж / мес.</div><div class="r-value">~ 54 000 ₽</div></div>';
+    h += '<div class="r-param"><div class="r-label">Лимит</div><div class="r-value" style="color:#003b6f;">' + snap.amount.toLocaleString('ru-RU') + ' ₽</div></div>';
+    h += '<div class="r-param"><div class="r-label">Ставка</div><div class="r-value" style="color:#10b981;">' + Number(snap.rate).toFixed(1) + '%</div></div>';
+    h += '<div class="r-param"><div class="r-label">Срок</div><div class="r-value">' + snap.term + ' ' + termLabel + '</div></div>';
+    h += '<div class="r-param"><div class="r-label">Платёж / мес.</div><div class="r-value">~ ' + snap.payment.toLocaleString('ru-RU') + ' ₽</div></div>';
     h += '</div>';
     h += '<button class="btn btn-primary" style="max-width:250px;margin:0 auto;" onclick="closeFullScoring()">Перейти к подписанию договора</button>';
     h += '</div>';
@@ -137,12 +158,11 @@ function closeFullScoring() {
     if (typeof refreshClientApplicationsUI === 'function') {
         refreshClientApplicationsUI(state.selectedApp || state.conveyorAppId);
     }
+    if (typeof refreshDashboard === 'function') refreshDashboard();
     navigateTo('applications');
 }
 
-// Привязка кнопки полного скоринга (делегирование)
 document.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'btnFullScoring') {
-        openFullScoring();
-    }
+    var btn = e.target && (e.target.id === 'btnFullScoring' ? e.target : e.target.closest && e.target.closest('#btnFullScoring'));
+    if (btn) openFullScoring();
 });

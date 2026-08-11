@@ -32,4 +32,18 @@ function bindEvents() {
     if (filterSearch && typeof filterApplications === 'function') {
         filterSearch.addEventListener('input', filterApplications);
     }
+
+    if (typeof initSharedDataSync === 'function') {
+        initSharedDataSync(function() {
+            refreshData();
+            if (typeof renderApplicationList === 'function') renderApplicationList();
+            if (typeof selectedAppId !== 'undefined' && selectedAppId && typeof renderApplicationDetail === 'function') {
+                renderApplicationDetail(selectedAppId);
+            }
+            if (typeof updateStats === 'function') updateStats();
+            if (typeof renderChatTab === 'function' && document.getElementById('m-tab-chat') && !document.getElementById('m-tab-chat').classList.contains('hidden')) {
+                renderChatTab();
+            }
+        });
+    }
 }

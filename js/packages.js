@@ -146,6 +146,10 @@ function applyPackageModifiers(pkg) {
         rate = +(rate - 0.2).toFixed(1);
         limit = Math.round(limit * 1.15 / 100000) * 100000;
     }
+    if (mods.fixedRate) {
+        // Фиксация ставки: небольшая надбавка за стабильность, без переменного периода
+        rate = +(rate + 0.15).toFixed(1);
+    }
 
     const payment = calculatePayment(limit, rate, state.currentTerm);
     return { rate, ltv, limit, payment };
@@ -209,9 +213,15 @@ function renderPackageCards() {
 
 function selectOfferPackage(id) {
     state.selectedPackageId = id;
+    if (id === 'PKG_NO_INSURANCE') {
+        state.packageModifiers = state.packageModifiers || {};
+        state.packageModifiers.ltvBoost = false;
+        state.packageModifiers.coBorrower = false;
+    }
     syncStateFromSelectedPackage();
     renderPackageCards();
     updateResultCards();
+    if (typeof updatePackageExtrasUI === 'function') updatePackageExtrasUI();
 }
 
 function togglePackageExtra(key, checked) {
@@ -219,12 +229,17 @@ function togglePackageExtra(key, checked) {
     const pkg = (state.eligiblePackages || []).find(p => p.id === state.selectedPackageId);
     if (checked && pkg && pkg.id === 'PKG_NO_INSURANCE' && (key === 'ltvBoost' || key === 'coBorrower')) {
         alert('Опция «' + (key === 'ltvBoost' ? 'Больше сумма (LTV Boost)' : 'Созаёмщик') + '» недоступна для пакета «Без страхования жизни».\n\nЭти опции требуют наличия комплексного страхования (ККС). Выберите пакет со страхованием.');
-        return; // Не применяем изменение
+        const map = { ltvBoost: 'extraLtvBoost', coBorrower: 'extraCoBorrower', fixedRate: 'extraFixedRate' };
+        const el = document.getElementById(map[key]);
+        if (el) el.checked = false;
+        return;
     }
     
     // Проверка конфликта типов ставки
     if (checked && key === 'fixedRate' && pkg && pkg.rateSubsequent) {
         alert('Пакет «' + pkg.title + '» уже использует переменную ставку. Фиксированная ставка недоступна.');
+        const el = document.getElementById('extraFixedRate');
+        if (el) el.checked = false;
         return;
     }
     
@@ -355,7 +370,7 @@ function acceptOfferPackage() {
         sendChatMessage(
             'manager',
             clientName,
-            'Александр, зафиксировали выбранные условия («' + pkg.title + '»). Далее подготовим список документов для финального решения.',
+            clientName.split(' ')[0] + ', зафиксировали выбранные условия («' + pkg.title + '»). Далее подготовим список документов для финального решения.',
             clientName
         );
     }

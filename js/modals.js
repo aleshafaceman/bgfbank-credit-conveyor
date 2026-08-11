@@ -48,16 +48,27 @@ function applyLowerPayment() {
 function updateHigherAmount() {
     const l = document.getElementById('chkLTV').checked;
     const c = document.getElementById('chkCoBorrower').checked;
+
+    // Та же математика, что и в applyPackageModifiers
     let nl = state.baseLTV;
     let nr = state.baseRate;
     let nlim = state.baseLimit;
-    
-    if (l) { nl = 0.70; nr += 0.3; }
-    nlim = Math.round(state.collateralValue * nl / 100000) * 100000;
-    if (c) { nr -= 0.2; nlim = Math.round(nlim * 1.2 / 100000) * 100000; }
-    
+
+    if (l) {
+        nl = Math.min(0.7, nl + 0.1);
+        nr = +(nr + 0.25).toFixed(1);
+        nlim = Math.round(state.collateralValue * nl / 100000) * 100000;
+        nlim = Math.min(nlim, Math.round((state.desiredAmount || nlim) * 1.05 / 100000) * 100000);
+    } else {
+        nlim = Math.round(state.collateralValue * nl / 100000) * 100000;
+    }
+    if (c) {
+        nr = +(nr - 0.2).toFixed(1);
+        nlim = Math.round(nlim * 1.15 / 100000) * 100000;
+    }
+
     const np = calculatePayment(nlim, nr, state.currentTerm);
-    
+
     document.getElementById('infoNewLimit').textContent = nlim.toLocaleString('ru-RU') + ' ₽';
     document.getElementById('infoNewRate').textContent = nr.toFixed(1) + '%';
     document.getElementById('infoNewMonthly').textContent = '~ ' + np.toLocaleString('ru-RU') + ' ₽';

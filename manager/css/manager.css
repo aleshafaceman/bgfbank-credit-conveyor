@@ -122,3 +122,15 @@ body { background: #f0f4f8; min-height: 100vh; }
 .m-client-app-card .m-app-info { flex: 1; }
 .m-client-app-card .m-app-number { font-weight: 700; font-size: 13px; color: #003b6f; }
 .m-client-app-card .m-app-meta { font-size: 11px; color: #94a3b8; }
+/* Мобильная адаптация панели менеджера */
+@media (max-width: 960px) {
+  .m-header { flex-wrap: wrap; padding: 14px 16px; gap: 12px; }
+  .m-stats { flex-wrap: wrap; gap: 10px; width: 100%; order: 3; }
+  .m-tabs { padding: 0 8px; overflow-x: auto; }
+  .m-tab { padding: 12px 14px; white-space: nowrap; font-size: 13px; }
+  .m-content { padding: 16px; }
+  .m-applications-layout { grid-template-columns: 1fr !important; }
+  .m-app-list { max-height: 280px; overflow-y: auto; }
+  .m-info-grid { grid-template-columns: 1fr; }
+  #m-tab-chat > div { grid-template-columns: 1fr !important; height: auto !important; }
+}
