@@ -302,32 +302,35 @@ function showIssueModal(issue, stepIndex, callback) {
     document.getElementById('issueModal').classList.remove('hidden');
 }
 
+function isRejectScoringAction(actionLabel) {
+    return /отклон|отказ/i.test(actionLabel || '');
+}
+
 function resolveIssue(actionIndex) {
     document.getElementById('issueModal').classList.add('hidden');
     
     if (pendingIssue) {
         var issue = pendingIssue.issue;
         var stepIndex = pendingIssue.stepIndex;
+        var actionLabel = issue.actions[actionIndex] || '';
         
-        // Логируем проблему
         issueLog.push({
             step: stepIndex,
             stepName: steps[stepIndex].name,
             type: issue.type,
             title: issue.title,
-            resolved: actionIndex === 0 ? (issue.type === 'error' ? 'Продолжено менеджером' : 'Принято') : issue.actions[actionIndex]
+            resolved: actionLabel
         });
         
         updateIssueCounters();
         
-        // Для ошибок: если менеджер выбрал не первую кнопку — прерываем
-        if (issue.type === 'error' && actionIndex > 0) {
-            // Отклонено или запрошены документы
+        // Решение по смыслу кнопки, а не по индексу
+        if (isRejectScoringAction(actionLabel)) {
             showFinalResult('rejected');
+            pendingIssue = null;
             return;
         }
         
-        // Продолжаем
         if (pendingIssue.callback) pendingIssue.callback();
         pendingIssue = null;
     }

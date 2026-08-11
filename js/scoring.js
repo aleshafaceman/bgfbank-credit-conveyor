@@ -94,46 +94,40 @@ function updateScoringDetail(idx) {
     }
 }
 
-function showScoringResult() {
-    var outcomes = ['approved', 'approved', 'rejected', 'needs-info'];
-    var outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
-    
-    var h = '';
-    
+function applyClientScoringDecision(outcome) {
+    var appId = (typeof state !== 'undefined' && (state.selectedApp || state.conveyorAppId)) || '4421-И';
+    if (typeof updateApplicationStatus !== 'function') return;
+
     if (outcome === 'approved') {
-        h += '<div class="scoring-result approved">';
-        h += '<div class="r-icon">✅</div>';
-        h += '<div class="r-title" style="color:#065f46;">Кредит одобрен</div>';
-        h += '<div class="r-desc">Все проверки пройдены успешно. Кредитный рейтинг 720 (хороший).</div>';
-        h += '<div class="r-params">';
-        h += '<div class="r-param"><div class="r-label">Лимит</div><div class="r-value" style="color:#003b6f;">5 400 000 ₽</div></div>';
-        h += '<div class="r-param"><div class="r-label">Ставка</div><div class="r-value" style="color:#10b981;">12.5%</div></div>';
-        h += '<div class="r-param"><div class="r-label">Срок</div><div class="r-value">15 лет</div></div>';
-        h += '<div class="r-param"><div class="r-label">Платёж / мес.</div><div class="r-value">~ 54 000 ₽</div></div>';
-        h += '</div>';
-        h += '<button class="btn btn-primary" style="max-width:250px;margin:0 auto;" onclick="closeFullScoring()">Перейти к подписанию договора</button>';
-        h += '</div>';
+        if (typeof updateApplication === 'function') {
+            updateApplication(appId, { rate: 12.5, payment: 54000, amount: 5400000 });
+        }
+        updateApplicationStatus(appId, 'approved', 'Одобрено', 'Полный скоринг завершён: кредит одобрен');
+        if (typeof state !== 'undefined') state.selectedApp = appId;
     } else if (outcome === 'rejected') {
-        h += '<div class="scoring-result rejected">';
-        h += '<div class="r-icon">❌</div>';
-        h += '<div class="r-title" style="color:#991b1b;">В кредите отказано</div>';
-        h += '<div class="r-desc">PTI превышает 50%. Текущее значение: 52%.</div>';
-        h += '<div class="r-params">';
-        h += '<div class="r-param"><div class="r-label">Запрошено</div><div class="r-value">5 000 000 ₽</div></div>';
-        h += '<div class="r-param"><div class="r-label">Доступно</div><div class="r-value" style="color:#f59e0b;">4 200 000 ₽</div></div>';
-        h += '</div>';
-        h += '<div style="font-size:12px;color:#64748b;margin-bottom:12px;">Рекомендации: уменьшить сумму, увеличить срок, добавить созаёмщика.</div>';
-        h += '<button class="btn btn-primary" style="max-width:250px;margin:0 auto;" onclick="closeFullScoring()">Изменить параметры</button>';
-        h += '</div>';
-    } else {
-        h += '<div class="scoring-result needs-info">';
-        h += '<div class="r-icon">⚠️</div>';
-        h += '<div class="r-title" style="color:#92400e;">Требуется уточнение</div>';
-        h += '<div class="r-desc">Не подтверждён доп. доход. Требуется актуальная выписка ЕГРН.</div>';
-        h += '<button class="btn btn-primary" style="max-width:250px;margin:0 auto;" onclick="closeFullScoring()">Загрузить документы</button>';
-        h += '</div>';
+        updateApplicationStatus(appId, 'rejected', 'Отказ', 'Полный скоринг: в кредите отказано');
     }
-    
+}
+
+function showScoringResult() {
+    // Демо-сценарий: чекпоинты успешные → итог всегда одобрение
+    var outcome = 'approved';
+    applyClientScoringDecision(outcome);
+
+    var h = '';
+    h += '<div class="scoring-result approved">';
+    h += '<div class="r-icon">✅</div>';
+    h += '<div class="r-title" style="color:#065f46;">Кредит одобрен</div>';
+    h += '<div class="r-desc">Все проверки пройдены успешно. Кредитный рейтинг 720 (хороший).</div>';
+    h += '<div class="r-params">';
+    h += '<div class="r-param"><div class="r-label">Лимит</div><div class="r-value" style="color:#003b6f;">5 400 000 ₽</div></div>';
+    h += '<div class="r-param"><div class="r-label">Ставка</div><div class="r-value" style="color:#10b981;">12.5%</div></div>';
+    h += '<div class="r-param"><div class="r-label">Срок</div><div class="r-value">15 лет</div></div>';
+    h += '<div class="r-param"><div class="r-label">Платёж / мес.</div><div class="r-value">~ 54 000 ₽</div></div>';
+    h += '</div>';
+    h += '<button class="btn btn-primary" style="max-width:250px;margin:0 auto;" onclick="closeFullScoring()">Перейти к подписанию договора</button>';
+    h += '</div>';
+
     document.getElementById('scoringResult').innerHTML = h;
 }
 

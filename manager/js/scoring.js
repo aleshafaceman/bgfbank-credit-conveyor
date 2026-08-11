@@ -142,6 +142,50 @@ function showSIssueModal(issue, stepIdx, delays) {
     document.getElementById('sIssueModal').classList.remove('hidden');
 }
 
+function isRejectScoringAction(actionLabel) {
+    return /отклон|отказ/i.test(actionLabel || '');
+}
+
+function applyManagerScoringDecision(outcome) {
+    var appId = (typeof selectedAppId !== 'undefined' && selectedAppId) ? selectedAppId : null;
+    if (!appId || typeof updateApplicationStatus !== 'function') return;
+
+    var apps = typeof getAllApplications === 'function' ? getAllApplications() : [];
+    var app = apps.find(function(a) { return a.id === appId; });
+    if (!app) return;
+
+    if (outcome === 'approved') {
+        var rate = 12.5;
+        var payment = Math.round(app.amount * (rate / 100) / 12 / (1 - Math.pow(1 + (rate / 100) / 12, -app.term * 12)));
+        if (typeof updateApplication === 'function') {
+            updateApplication(appId, { rate: rate, payment: payment });
+        }
+        updateApplicationStatus(appId, 'approved', 'Одобрено', 'Полный скоринг завершён: кредит одобрен');
+        if (typeof sendChatMessage === 'function') {
+            sendChatMessage('manager', app.client, 'Поздравляю! По заявке №' + appId + ' полный скоринг завершён — кредит одобрен.', app.client);
+        }
+    } else {
+        updateApplicationStatus(appId, 'rejected', 'Отказ', 'Полный скоринг: в кредите отказано');
+        if (typeof sendChatMessage === 'function') {
+            sendChatMessage('manager', app.client, 'По заявке №' + appId + ' по результатам полного скоринга принято отрицательное решение.', app.client);
+        }
+    }
+
+    if (typeof refreshData === 'function') refreshData();
+    if (typeof renderApplicationList === 'function') renderApplicationList();
+    if (typeof renderApplicationDetail === 'function') renderApplicationDetail(appId);
+    if (typeof updateStats === 'function') updateStats();
+}
+
+function confirmManagerScoringDecision(outcome) {
+    if (outcome === 'approved') {
+        alert('Заявка №' + selectedAppId + ' одобрена');
+    } else {
+        alert('Заявка №' + selectedAppId + ' отклонена');
+    }
+    closeManagerScoring();
+}
+
 function resolveSIssue(actionIdx) {
     document.getElementById('sIssueModal').classList.add('hidden');
     if (!sPendingIssue) return;
@@ -149,11 +193,19 @@ function resolveSIssue(actionIdx) {
     var issue = sPendingIssue.issue;
     var stepIdx = sPendingIssue.stepIdx;
     var delays = sPendingIssue.delays;
+    var actionLabel = issue.actions[actionIdx] || '';
     
-    sIssueLog.push({ step: stepIdx, stepName: sSteps[stepIdx].name, type: issue.type, title: issue.title, resolved: actionIdx === 0 ? 'Продолжено' : issue.actions[actionIdx] });
+    sIssueLog.push({
+        step: stepIdx,
+        stepName: sSteps[stepIdx].name,
+        type: issue.type,
+        title: issue.title,
+        resolved: actionLabel
+    });
     updateSIssueCounters();
     
-    if (issue.type === 'error' && actionIdx > 0) {
+    // Решение по смыслу кнопки, а не по индексу
+    if (isRejectScoringAction(actionLabel)) {
         showSResult('rejected');
         sPendingIssue = null;
         return;
@@ -172,6 +224,7 @@ function showSResult(outcome) {
     document.getElementById('sDetailContent').innerHTML = '<span class="ok">✓ Система завершила обработку.</span>';
     renderSSteps();
     updateSIssueCounters();
+    applyManagerScoringDecision(outcome);
     
     var h = '';
     
@@ -185,10 +238,10 @@ function showSResult(outcome) {
     
     if (outcome === 'approved') {
         document.getElementById('sResultSubtitle').textContent = 'Заявка одобрена';
-        h += '<div class="s-result approved"><div class="r-icon">✅</div><div class="r-title" style="color:#065f46;">Кредит одобрен</div><div class="r-desc">Все проверки пройдены.</div><div class="r-params"><div class="r-param"><div class="r-label">Лимит</div><div class="r-value" style="color:#003b6f;">5 400 000 ₽</div></div><div class="r-param"><div class="r-label">Ставка</div><div class="r-value" style="color:#10b981;">12.5%</div></div><div class="r-param"><div class="r-label">Срок</div><div class="r-value">15 лет</div></div><div class="r-param"><div class="r-label">Платёж</div><div class="r-value">~ 54 000 ₽</div></div></div><div class="s-btn-row"><button class="s-btn s-btn-success" onclick="alert(\'Заявка одобрена\')"><i class="fas fa-check"></i> Одобрить</button><button class="s-btn s-btn-outline" onclick="alert(\'Чат открыт\')"><i class="fas fa-comment-dots"></i> Чат</button></div></div>';
+        h += '<div class="s-result approved"><div class="r-icon">✅</div><div class="r-title" style="color:#065f46;">Кредит одобрен</div><div class="r-desc">Все проверки пройдены. Статус заявки обновлён.</div><div class="r-params"><div class="r-param"><div class="r-label">Лимит</div><div class="r-value" style="color:#003b6f;">5 400 000 ₽</div></div><div class="r-param"><div class="r-label">Ставка</div><div class="r-value" style="color:#10b981;">12.5%</div></div><div class="r-param"><div class="r-label">Срок</div><div class="r-value">15 лет</div></div><div class="r-param"><div class="r-label">Платёж</div><div class="r-value">~ 54 000 ₽</div></div></div><div class="s-btn-row"><button class="s-btn s-btn-success" onclick="confirmManagerScoringDecision(\'approved\')"><i class="fas fa-check"></i> Готово</button><button class="s-btn s-btn-outline" onclick="closeManagerScoring()"><i class="fas fa-times"></i> Закрыть</button></div></div>';
     } else {
         document.getElementById('sResultSubtitle').textContent = 'Заявка отклонена';
-        h += '<div class="s-result rejected"><div class="r-icon">❌</div><div class="r-title" style="color:#991b1b;">В кредите отказано</div><div class="r-desc">Обнаружены стоп-факторы.</div><div class="s-btn-row"><button class="s-btn s-btn-danger" onclick="alert(\'Заявка отклонена\')"><i class="fas fa-times"></i> Отклонить</button><button class="s-btn s-btn-outline" onclick="alert(\'Чат открыт\')"><i class="fas fa-comment-dots"></i> Чат</button></div></div>';
+        h += '<div class="s-result rejected"><div class="r-icon">❌</div><div class="r-title" style="color:#991b1b;">В кредите отказано</div><div class="r-desc">Обнаружены стоп-факторы. Статус заявки обновлён.</div><div class="s-btn-row"><button class="s-btn s-btn-danger" onclick="confirmManagerScoringDecision(\'rejected\')"><i class="fas fa-times"></i> Готово</button><button class="s-btn s-btn-outline" onclick="closeManagerScoring()"><i class="fas fa-comment-dots"></i> Закрыть</button></div></div>';
     }
     
     document.getElementById('sResultArea').innerHTML = h;
