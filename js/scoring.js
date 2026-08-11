@@ -134,7 +134,10 @@ function showScoringResult() {
 function closeFullScoring() {
     clearTimeout(scoringTimer);
     document.getElementById('scoringOverlay').classList.add('hidden');
-    navigateTo('dashboard');
+    if (typeof refreshClientApplicationsUI === 'function') {
+        refreshClientApplicationsUI(state.selectedApp || state.conveyorAppId);
+    }
+    navigateTo('applications');
 }
 
 // Привязка кнопки полного скоринга (делегирование)

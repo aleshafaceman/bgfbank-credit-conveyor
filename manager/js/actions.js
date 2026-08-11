@@ -29,7 +29,11 @@ function managerAction(appId, action) {
             updateStats();
             
             setTimeout(() => {
-                const updatedApp = getManagerApplications().find(a => a.id === appId);
+                refreshData();
+                const updatedApp = (typeof getAllApplications === 'function'
+                    ? getAllApplications()
+                    : (typeof managerApplications !== 'undefined' ? managerApplications : [])
+                ).find(a => a.id === appId);
                 if (updatedApp) {
                     const rate = 12.5;
                     const payment = Math.round(updatedApp.amount * (rate / 100) / 12 / (1 - Math.pow(1 + (rate / 100) / 12, -updatedApp.term * 12)));

@@ -176,6 +176,10 @@ function enterApp() {
     document.querySelectorAll('.nav-link')[0].classList.add('active');
     state.currentPage = 'dashboard';
     init2FAToggle();
+    if (typeof loadSharedData === 'function') loadSharedData();
+    if (typeof refreshClientApplicationsUI === 'function') {
+        refreshClientApplicationsUI(state.selectedApp || '4421-И');
+    }
 }
 
 // ========== ВЫХОД ==========

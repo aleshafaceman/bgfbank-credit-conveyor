@@ -23,7 +23,11 @@ function navigateTo(page) {
             document.getElementById('view-applications').classList.remove('hidden');
             document.getElementById('pageTitle').innerText = 'Мои заявки';
             document.getElementById('pageSubtitle').innerText = 'Управление заявками';
-            selectApplication(state.selectedApp);
+            if (typeof refreshClientApplicationsUI === 'function') {
+                refreshClientApplicationsUI(state.selectedApp);
+            } else {
+                selectApplication(state.selectedApp);
+            }
             break;
         case 'mortgage':
             document.getElementById('view-mortgage').classList.remove('hidden');

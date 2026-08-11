@@ -1,22 +1,146 @@
 // ========== МОИ ЗАЯВКИ (КЛИЕНТ) ==========
 
+function getClientDisplayName() {
+    if (typeof getUserCredentials === 'function') {
+        const u = getUserCredentials();
+        if (u && u.name) return u.name;
+    }
+    return 'Александр Кузнецов';
+}
+
+function getClientApplications() {
+    if (typeof loadSharedData === 'function') loadSharedData();
+    const name = getClientDisplayName();
+    if (typeof getApplicationsForClient === 'function') {
+        return getApplicationsForClient(name);
+    }
+    if (typeof getAllApplications === 'function') {
+        return getAllApplications().filter(a => a.client === name);
+    }
+    return [];
+}
+
+function getAppStatusMeta(status, statusLabel) {
+    const label = statusLabel || status || '';
+    if (status === 'approved') {
+        return { cls: 'status-done', icon: 'fas fa-check', label: label || 'Одобрено' };
+    }
+    if (status === 'rejected') {
+        return { cls: 'status-reject', icon: 'fas fa-times', label: label || 'Отказ' };
+    }
+    return {
+        cls: 'status-active',
+        icon: 'fas fa-sync-alt fa-spin',
+        label: label || 'В обработке'
+    };
+}
+
+function formatAppAmount(amount) {
+    return amount != null ? amount.toLocaleString('ru-RU') + ' ₽' : '—';
+}
+
+function formatAppTerm(term) {
+    if (term == null) return '—';
+    const n = Number(term);
+    const word = n === 1 ? 'год' : (n < 5 ? 'года' : 'лет');
+    return n + ' ' + word;
+}
+
+function getStepperHTML(status) {
+    const steps = ['Параметры', 'Данные', 'Оценка', 'Прескоринг', 'Решение'];
+    let current = 2;
+    if (status === 'new') current = 1;
+    else if (status === 'processing') current = 3;
+    else if (status === 'valuation') current = 2;
+    else if (status === 'decision') current = 4;
+    else if (status === 'approved' || status === 'rejected') current = 5;
+
+    let h = '<div class="mini-stepper">';
+    steps.forEach(function(name, i) {
+        const idx = i + 1;
+        let cls = '';
+        if (idx < current) cls = 'done';
+        else if (idx === current) cls = 'current';
+        if (i > 0) h += '<div class="mini-step-sep"></div>';
+        h += '<div class="mini-step ' + cls + '"><div class="dot"></div>' + name + '</div>';
+    });
+    h += '</div>';
+    return h;
+}
+
+function renderApplicationsList() {
+    const list = document.getElementById('applicationsList');
+    if (!list) return;
+
+    const apps = getClientApplications();
+    if (!apps.length) {
+        list.innerHTML = '<div class="detail-empty" style="padding:24px;"><i class="fas fa-file-alt"></i><p>Нет заявок</p></div>';
+        return;
+    }
+
+    list.innerHTML = apps.map(function(app) {
+        const meta = getAppStatusMeta(app.status, app.statusLabel);
+        const active = app.id === state.selectedApp ? ' active-card' : '';
+        return '<div class="application-card' + active + '" onclick="selectApplication(\'' + app.id + '\')" data-app="' + app.id + '">' +
+            '<div class="app-header"><span class="app-number">№' + app.id + '</span><span class="app-date">' + (app.date || '') + '</span></div>' +
+            '<div class="app-product">' + (app.product || 'Кредит под залог недвижимости') + '</div>' +
+            '<span class="app-status ' + meta.cls + '"><i class="' + meta.icon + '" style="font-size: 10px;"></i> ' + meta.label + '</span>' +
+            '</div>';
+    }).join('');
+
+    const badge = document.querySelector('.nav-link .badge');
+    if (badge) {
+        const activeCount = apps.filter(a => a.status !== 'approved' && a.status !== 'rejected').length;
+        badge.textContent = String(activeCount);
+        badge.style.display = activeCount ? '' : 'none';
+    }
+}
+
+function refreshClientApplicationsUI(preferredAppId) {
+    const apps = getClientApplications();
+    const preferred = preferredAppId || state.selectedApp;
+    const stillExists = apps.some(a => a.id === preferred);
+    const nextId = stillExists ? preferred : (apps[0] && apps[0].id);
+
+    renderApplicationsList();
+    if (nextId) selectApplication(nextId);
+    else {
+        const c = document.getElementById('applicationDetail');
+        if (c) c.innerHTML = '<div class="detail-empty"><i class="fas fa-file-alt"></i><p>Выберите заявку</p></div>';
+    }
+}
+
 function selectApplication(appId) {
     state.selectedApp = appId;
     document.querySelectorAll('.application-card').forEach(c => c.classList.remove('active-card'));
-    const card = document.querySelector(`[data-app="${appId}"]`);
+    const card = document.querySelector('[data-app="' + appId + '"]');
     if (card) card.classList.add('active-card');
     renderApplicationDetail(appId);
 }
 
 function renderApplicationDetail(appId) {
     const c = document.getElementById('applicationDetail');
-    switch(appId) {
-        case '4421-И': c.innerHTML = getActiveApplicationHTML(); break;
-        case '3890-И': c.innerHTML = getApprovedApplicationHTML(); break;
-        case '3701-И': c.innerHTML = getRejectedApplicationHTML(); break;
-        case '3600-И': c.innerHTML = getDraftApplicationHTML(); break;
-        default: c.innerHTML = '<div class="detail-empty"><i class="fas fa-file-alt"></i><p>Выберите заявку</p></div>';
+    if (!c) return;
+
+    if (typeof loadSharedData === 'function') loadSharedData();
+    const apps = typeof getAllApplications === 'function' ? getAllApplications() : [];
+    const app = apps.find(a => a.id === appId);
+
+    if (!app) {
+        c.innerHTML = '<div class="detail-empty"><i class="fas fa-file-alt"></i><p>Выберите заявку</p></div>';
+        return;
     }
+
+    if (app.status === 'approved') {
+        c.innerHTML = getApprovedApplicationHTML(app);
+        return;
+    }
+    if (app.status === 'rejected') {
+        c.innerHTML = getRejectedApplicationHTML(app);
+        return;
+    }
+
+    c.innerHTML = getActiveApplicationHTML(app);
 }
 
 function renderApplicationPackageBlock(app) {
@@ -69,27 +193,32 @@ function renderApplicationPackageBlock(app) {
     </div>`;
 }
 
-function getActiveApplicationHTML() {
-    if (typeof loadSharedData === 'function') loadSharedData();
-    const app = typeof getAllApplications === 'function' ? getAllApplications().find(a => a.id === '4421-И') : null;
-    const amount = app && app.amount ? app.amount.toLocaleString('ru-RU') + ' ₽' : '5 000 000 ₽';
-    const term = app && app.term ? app.term + ' ' + (app.term === 1 ? 'год' : app.term < 5 ? 'года' : 'лет') : '15 лет';
-    const rate = app && app.rate ? app.rate + '%' : 'ожидается';
-    const payment = app && app.payment ? '~ ' + app.payment.toLocaleString('ru-RU') + ' ₽' : '';
-    const statusLabel = app ? app.statusLabel : 'В обработке';
+function getActiveApplicationHTML(app) {
+    const amount = formatAppAmount(app.amount);
+    const term = formatAppTerm(app.term);
+    const rate = app.rate != null ? app.rate + '%' : 'ожидается';
+    const payment = app.payment != null ? '~ ' + app.payment.toLocaleString('ru-RU') + ' ₽' : '';
+    const statusLabel = app.statusLabel || 'В обработке';
     const pkgBlock = renderApplicationPackageBlock(app);
+    const missingDocs = (app.documents || []).filter(d => d.status === 'missing');
+    const continueCta = (app.status !== 'approved' && app.status !== 'rejected')
+        ? '<button type="button" class="btn btn-primary app-detail-cta" onclick="openConveyorFromApplications()">Продолжить оформление</button>'
+        : '';
+
+    let actions = '';
+    if (missingDocs.length) {
+        actions = '<div class="action-list"><h4><i class="fas fa-exclamation-circle"></i> Необходимые действия</h4>' +
+            missingDocs.map(d =>
+                '<div class="action-item"><i class="fas fa-file-upload"></i><span>Загрузите: ' + d.name + '</span>' +
+                '<button type="button" class="action-btn">Загрузить</button></div>'
+            ).join('') + '</div>';
+    }
 
     return `<div class="detail-header">
-        <div><div class="detail-number">№4421-И</div><div class="detail-product">Кредит под залог недвижимости</div></div>
-        <div class="detail-date">Создана: 15 июня 2026 · ${statusLabel}</div>
+        <div><div class="detail-number">№${app.id}</div><div class="detail-product">${app.product || 'Кредит под залог недвижимости'}</div></div>
+        <div class="detail-date">Создана: ${app.date || '—'} · ${statusLabel}</div>
     </div>
-    <div class="mini-stepper">
-        <div class="mini-step done"><div class="dot"></div>Параметры</div><div class="mini-step-sep"></div>
-        <div class="mini-step done"><div class="dot"></div>Данные</div><div class="mini-step-sep"></div>
-        <div class="mini-step current"><div class="dot"></div>Оценка</div><div class="mini-step-sep"></div>
-        <div class="mini-step"><div class="dot"></div>Прескоринг</div><div class="mini-step-sep"></div>
-        <div class="mini-step"><div class="dot"></div>Решение</div>
-    </div>
+    ${getStepperHTML(app.status)}
     <div class="detail-params">
         <div class="detail-param"><div class="param-label">Сумма</div><div class="param-value">${amount}</div></div>
         <div class="detail-param"><div class="param-label">Срок</div><div class="param-value">${term}</div></div>
@@ -97,32 +226,27 @@ function getActiveApplicationHTML() {
         ${payment ? '<div class="detail-param"><div class="param-label">Платёж / мес.</div><div class="param-value">' + payment + '</div></div>' : ''}
     </div>
     ${pkgBlock}
-    ${renderClientDUSection({ collateralAddress: 'г. Москва, ул. Крылатская, д. 15, кв. 42' })}
-    <div class="action-list">
-        <h4><i class="fas fa-exclamation-circle"></i> Необходимые действия</h4>
-        <div class="action-item"><i class="fas fa-file-upload"></i><span>Загрузите справку 2-НДФЛ</span><button type="button" class="action-btn">Загрузить</button></div>
-    </div>
-    <button type="button" class="btn btn-primary app-detail-cta" onclick="openConveyorFromApplications()">Продолжить оформление</button>`;
+    ${renderClientDUSection({ collateralAddress: app.collateralAddress || '' })}
+    ${actions}
+    ${continueCta}`;
 }
 
-function getApprovedApplicationHTML() {
-    return `<div class="detail-header"><div><div class="detail-number">№3890-И</div><div class="detail-product">Кредит под залог недвижимости</div></div><div class="detail-date">Одобрена: 10 февраля 2026</div></div>
+function getApprovedApplicationHTML(app) {
+    const amount = formatAppAmount(app.amount);
+    const term = formatAppTerm(app.term);
+    const rate = app.rate != null ? app.rate + '%' : '—';
+    const payment = app.payment != null ? '~ ' + app.payment.toLocaleString('ru-RU') + ' ₽' : '—';
+    return `<div class="detail-header"><div><div class="detail-number">№${app.id}</div><div class="detail-product">${app.product || 'Кредит под залог недвижимости'}</div></div><div class="detail-date">Одобрена: ${app.date || ''}</div></div>
     <div class="approved-badge"><i class="fas fa-check-circle"></i> Кредит одобрен</div>
-    <div class="detail-params"><div class="detail-param"><div class="param-label">Одобренный лимит</div><div class="param-value">4 200 000 ₽</div></div><div class="detail-param"><div class="param-label">Ставка</div><div class="param-value" style="color:#10b981;">12.8%</div></div><div class="detail-param"><div class="param-label">Срок</div><div class="param-value">15 лет</div></div><div class="detail-param"><div class="param-label">Платёж / мес.</div><div class="param-value">~ 48 300 ₽</div></div></div>
-    <div class="payment-schedule"><h4><i class="fas fa-table"></i> График платежей</h4><table class="schedule-table"><thead><tr><th>Месяц</th><th>Платёж</th><th>Осн. долг</th><th>Проценты</th><th>Остаток</th></tr></thead><tbody><tr><td>Март 2026</td><td>48 300 ₽</td><td>12 100 ₽</td><td>36 200 ₽</td><td>4 187 900 ₽</td></tr><tr><td>Апрель 2026</td><td>48 300 ₽</td><td>12 300 ₽</td><td>36 000 ₽</td><td>4 175 600 ₽</td></tr><tr><td>Май 2026</td><td>48 300 ₽</td><td>12 500 ₽</td><td>35 800 ₽</td><td>4 163 100 ₽</td></tr></tbody></table></div>
-    <div style="display:flex;gap:12px;margin-top:24px;"><button class="btn btn-primary" style="flex:1;" onclick="alert('Переход к подписанию договора...')"><i class="fas fa-signature" style="margin-right:8px;"></i> Подписать договор</button><button class="btn-sm" style="width:auto;padding:18px 24px;border:1px solid #cbd5e1;background:white;" onclick="alert('Открывается полный график платежей...')"><i class="fas fa-download"></i></button></div>`;
+    <div class="detail-params"><div class="detail-param"><div class="param-label">Одобренный лимит</div><div class="param-value">${amount}</div></div><div class="detail-param"><div class="param-label">Ставка</div><div class="param-value" style="color:#10b981;">${rate}</div></div><div class="detail-param"><div class="param-label">Срок</div><div class="param-value">${term}</div></div><div class="detail-param"><div class="param-label">Платёж / мес.</div><div class="param-value">${payment}</div></div></div>
+    <div style="display:flex;gap:12px;margin-top:24px;"><button class="btn btn-primary" style="flex:1;" onclick="alert('Переход к подписанию договора...')"><i class="fas fa-signature" style="margin-right:8px;"></i> Подписать договор</button></div>`;
 }
 
-function getRejectedApplicationHTML() {
-    return `<div class="detail-header"><div><div class="detail-number">№3701-И</div><div class="detail-product">Кредит под залог недвижимости</div></div></div>
-    <div class="rejection-reason"><h4><i class="fas fa-times-circle"></i> Причина отказа</h4><p>Недостаточный уровень подтверждённого дохода.</p></div>
-    <button class="btn btn-primary" onclick="navigateTo('applications');selectApplication('4421-И');">Подать новую заявку</button>`;
-}
-
-function getDraftApplicationHTML() {
-    return `<div class="detail-header"><div><div class="detail-number">№3600-И</div><div class="detail-product">Кредит под залог недвижимости</div></div></div>
-    <div class="detail-params"><div class="detail-param"><div class="param-label">Сумма</div><div class="param-value">3 000 000 ₽</div></div><div class="detail-param"><div class="param-label">Статус</div><div class="param-value" style="color:#f59e0b;">Черновик</div></div></div>
-    <button class="btn btn-primary" onclick="openConveyorFromApplications()">Продолжить заполнение</button>`;
+function getRejectedApplicationHTML(app) {
+    const reason = (app.history && app.history[0] && app.history[0].text) || 'Недостаточный уровень подтверждённого дохода.';
+    return `<div class="detail-header"><div><div class="detail-number">№${app.id}</div><div class="detail-product">${app.product || 'Кредит под залог недвижимости'}</div></div></div>
+    <div class="rejection-reason"><h4><i class="fas fa-times-circle"></i> Причина отказа</h4><p>${reason}</p></div>
+    <button class="btn btn-primary" onclick="navigateTo('applications');selectApplication('4421-И');">К активной заявке</button>`;
 }
 
 // ========== ДОПОЛНИТЕЛЬНЫЕ УСЛОВИЯ (ДУ) ДЛЯ КЛИЕНТА ==========
