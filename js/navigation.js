@@ -1,8 +1,27 @@
 // ========== НАВИГАЦИЯ ==========
 // Переключение разделов личного кабинета
 
+function toggleMobileSidebar() {
+    const shell = document.getElementById('appShell');
+    if (!shell || !shell.classList.contains('app-logged-in')) return;
+    shell.classList.toggle('sidebar-open');
+    const open = shell.classList.contains('sidebar-open');
+    const sidebar = document.getElementById('appSidebar');
+    if (sidebar) sidebar.setAttribute('aria-hidden', open ? 'false' : 'true');
+}
+
+function closeMobileSidebar() {
+    const shell = document.getElementById('appShell');
+    if (shell) shell.classList.remove('sidebar-open');
+    const sidebar = document.getElementById('appSidebar');
+    if (sidebar && shell && shell.classList.contains('app-logged-in')) {
+        sidebar.setAttribute('aria-hidden', 'true');
+    }
+}
+
 function navigateTo(page) {
     state.currentPage = page;
+    if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
     
     // Скрываем все разделы
     ['view-conveyor','view-applications','view-dashboard','view-mortgage','view-profile','view-settings']

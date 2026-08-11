@@ -103,9 +103,14 @@
 </div>
 
 <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
-<div class="desktop-wrapper">
-    <aside class="sidebar" id="appSidebar" style="display: none;">
-        <div class="brand"><div class="logo-box">Б</div><div style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">БЖФ БАНК</div></div>
+<div class="desktop-wrapper" id="appShell">
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+    <aside class="sidebar" id="appSidebar" aria-hidden="true">
+        <div class="brand">
+            <div class="logo-box">Б</div>
+            <div style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">БЖФ БАНК</div>
+            <button type="button" class="sidebar-close-btn" id="sidebarCloseBtn" onclick="closeMobileSidebar()" aria-label="Закрыть меню"><i class="fas fa-times"></i></button>
+        </div>
         <nav class="nav-group">
             <a class="nav-link" onclick="navigateTo('dashboard')"><i class="fas fa-th-large"></i> Панель управления</a>
             <a class="nav-link active" onclick="navigateTo('applications')"><i class="fas fa-file-signature"></i> Мои заявки<span class="badge">1</span></a>
@@ -122,8 +127,11 @@
 
     <main class="main-container" id="mainContainer">
         <header class="top-header">
-            <h1 style="font-size: 24px; color: #003b6f;" id="pageTitle">Мои заявки</h1>
-            <p style="color: #7e9bb6; font-size: 14px;" id="pageSubtitle">Управление текущими и прошлыми заявками</p>
+            <button type="button" class="menu-toggle-btn" id="menuToggleBtn" onclick="toggleMobileSidebar()" aria-label="Открыть меню"><i class="fas fa-bars"></i></button>
+            <div class="top-header-text">
+                <h1 style="font-size: 24px; color: #003b6f;" id="pageTitle">Мои заявки</h1>
+                <p style="color: #7e9bb6; font-size: 14px;" id="pageSubtitle">Управление текущими и прошлыми заявками</p>
+            </div>
         </header>
 
         <div class="content-body" id="contentBody">

@@ -58,8 +58,10 @@ let propertyPortfolio = [
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 document.addEventListener('DOMContentLoaded', function() {
-    // Скрываем сайдбар до входа
-    document.getElementById('appSidebar').style.display = 'none';
+    const shell = document.getElementById('appShell');
+    if (shell) shell.classList.remove('app-logged-in', 'sidebar-open');
+    const sidebar = document.getElementById('appSidebar');
+    if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
     
     // Заполняем выпадающий список объектов
     populateCollateralSelect();

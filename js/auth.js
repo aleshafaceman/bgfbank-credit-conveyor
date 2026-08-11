@@ -168,7 +168,11 @@ function registerViaESIA() {
 // ========== ВХОД В ПРИЛОЖЕНИЕ ==========
 function enterApp() {
     document.getElementById('authFullscreen').classList.add('hidden');
-    document.getElementById('appSidebar').style.display = 'flex';
+    const shell = document.getElementById('appShell');
+    if (shell) shell.classList.add('app-logged-in');
+    const sidebar = document.getElementById('appSidebar');
+    if (sidebar) sidebar.setAttribute('aria-hidden', 'false');
+    if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
     document.getElementById('pageTitle').innerText = 'Панель управления';
     document.getElementById('pageSubtitle').innerText = 'Сводка по вашим активностям';
     document.getElementById('view-dashboard').classList.remove('hidden');
@@ -188,7 +192,11 @@ function logout() {
         ['view-dashboard','view-applications','view-conveyor','view-profile','view-settings','view-mortgage']
             .forEach(id => document.getElementById(id).classList.add('hidden'));
         
-        document.getElementById('appSidebar').style.display = 'none';
+        if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
+        const shell = document.getElementById('appShell');
+        if (shell) shell.classList.remove('app-logged-in');
+        const sidebar = document.getElementById('appSidebar');
+        if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
         document.getElementById('authFullscreen').classList.remove('hidden');
         
         ['view-auth-login','view-auth-sms','view-auth-2fa','view-auth-success',
