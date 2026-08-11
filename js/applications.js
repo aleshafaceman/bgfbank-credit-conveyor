@@ -249,6 +249,7 @@ function selectApplication(appId) {
 function renderApplicationDetail(appId) {
     const c = document.getElementById('applicationDetail');
     if (!c) return;
+    bindApplicationDetailActions();
 
     if (typeof loadSharedData === 'function') loadSharedData();
     const apps = typeof getAllApplications === 'function' ? getAllApplications() : [];
@@ -330,7 +331,7 @@ function getActiveApplicationHTML(app) {
     const pkgBlock = renderApplicationPackageBlock(app);
     const missingDocs = (app.documents || []).filter(d => d.status === 'missing');
     const continueCta = (app.status !== 'approved' && app.status !== 'rejected')
-        ? '<button type="button" class="btn btn-primary app-detail-cta" onclick="openConveyorFromApplications()">Продолжить оформление</button>'
+        ? '<button type="button" class="btn btn-primary app-detail-cta" data-action="continue-conveyor">Продолжить оформление</button>'
         : '';
 
     let actions = '';
@@ -338,7 +339,7 @@ function getActiveApplicationHTML(app) {
         actions = '<div class="action-list"><h4><i class="fas fa-exclamation-circle"></i> Необходимые действия</h4>' +
             missingDocs.map(d =>
                 '<div class="action-item"><i class="fas fa-file-upload"></i><span>Загрузите: ' + d.name + '</span>' +
-                '<button type="button" class="action-btn">Загрузить</button></div>'
+                '<button type="button" class="action-btn" data-action="upload-doc" data-doc-name="' + String(d.name).replace(/"/g, '&quot;') + '">Загрузить</button></div>'
             ).join('') + '</div>';
     }
 
@@ -354,9 +355,32 @@ function getActiveApplicationHTML(app) {
         ${payment ? '<div class="detail-param"><div class="param-label">Платёж / мес.</div><div class="param-value">' + payment + '</div></div>' : ''}
     </div>
     ${pkgBlock}
+    ${continueCta}
     ${renderClientDUSection({ collateralAddress: app.collateralAddress || '' })}
-    ${actions}
-    ${continueCta}`;
+    ${actions}`;
+}
+
+function bindApplicationDetailActions() {
+    const c = document.getElementById('applicationDetail');
+    if (!c || c._bgfDetailActionsBound) return;
+    c._bgfDetailActionsBound = true;
+    c.addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-action]');
+        if (!btn || !c.contains(btn)) return;
+        const action = btn.getAttribute('data-action');
+        if (action === 'continue-conveyor') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof openConveyorFromApplications === 'function') openConveyorFromApplications();
+            else alert('Конвейер оформления недоступен. Обновите страницу.');
+            return;
+        }
+        if (action === 'upload-doc') {
+            e.preventDefault();
+            const name = btn.getAttribute('data-doc-name') || 'документ';
+            alert('Открывается форма загрузки: ' + name);
+        }
+    });
 }
 
 function getApprovedApplicationHTML(app) {
@@ -474,20 +498,20 @@ function renderClientDUSection(app) {
     var clientDUs = duList.filter(function(d) { return d.source === 'client' || d.status === 'uploaded'; });
 
     clientDUs.forEach(function(du) {
-        var st = duStatuses[du.status];
+        var st = duStatuses[du.status] || duStatuses.pending;
         var isDone = du.status === 'uploaded' || du.status === 'auto_received';
 
         h += '<div class="client-du-item' + (isDone ? ' client-du-item--done' : ' client-du-item--pending') + '">';
         h += '<i class="fas ' + st.icon + ' client-du-icon"></i>';
         h += '<div class="client-du-body">';
         h += '<div class="client-du-name">' + du.name + '</div>';
-        if (du.params.length > 0) {
+        if (du.params && du.params.length > 0) {
             h += '<div class="client-du-meta">' + du.params.join(' · ') + '</div>';
         }
         h += '<span class="client-du-status" style="background:' + st.bg + ';color:' + st.color + ';">' + st.label + '</span>';
         h += '</div>';
         if (!isDone && du.source === 'client') {
-            h += '<button type="button" class="client-du-upload" onclick="alert(\'Открывается форма загрузки: ' + du.name.replace(/'/g, "\\'") + '\')"><i class="fas fa-upload"></i> Загрузить</button>';
+            h += '<button type="button" class="client-du-upload" data-action="upload-doc" data-doc-name="' + String(du.name).replace(/"/g, '&quot;') + '"><i class="fas fa-upload"></i> Загрузить</button>';
         }
         h += '</div>';
     });

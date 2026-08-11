@@ -41,20 +41,101 @@ function onCollateralSelect(v) {
     bm.disabled = false;
 }
 
+function hideEl(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+}
+
+function showEl(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('hidden');
+}
+
 function openConveyorForApp(appId) {
+    if (!appId) {
+        console.warn('openConveyorForApp: empty appId');
+        return;
+    }
+
     state.conveyorAppId = appId;
     state.selectedApp = appId;
-    document.getElementById('view-applications').classList.add('hidden');
-    document.getElementById('view-dashboard').classList.add('hidden');
-    document.getElementById('view-conveyor').classList.remove('hidden');
-    document.getElementById('pageTitle').innerText = 'Оформление заявки';
-    document.getElementById('pageSubtitle').innerText = 'Заявка №' + appId;
+
+    hideEl('view-applications');
+    hideEl('view-dashboard');
+    showEl('view-conveyor');
+
+    const title = document.getElementById('pageTitle');
+    const subtitle = document.getElementById('pageSubtitle');
+    if (title) title.innerText = 'Оформление заявки';
+    if (subtitle) subtitle.innerText = 'Заявка №' + appId;
+
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     const appsNav = document.querySelectorAll('.nav-link')[1];
     if (appsNav) appsNav.classList.add('active');
     state.currentPage = 'applications';
-    populateCollateralSelect();
-    resetConveyor();
+
+    try {
+        populateCollateralSelect();
+    } catch (err) {
+        console.error('populateCollateralSelect failed', err);
+    }
+
+    if (typeof loadSharedData === 'function') loadSharedData();
+    const apps = typeof getAllApplications === 'function' ? getAllApplications() : [];
+    const app = apps.find(a => a.id === appId);
+    const resumeAccepted = app && (
+        app.packageStatus === 'accepted' ||
+        (app.selectedPackageId && app.rate != null && app.payment != null)
+    );
+
+    try {
+        if (resumeAccepted) resumeAcceptedConveyor(app);
+        else resetConveyor();
+    } catch (err) {
+        console.error('openConveyorForApp resume/reset failed', err);
+        try { resetConveyor(); } catch (e2) {}
+    }
+}
+
+function resumeAcceptedConveyor(app) {
+    state.offerAccepted = true;
+    state.selectedPackageId = app.selectedPackageId || 'PKG_RECOMMENDED';
+    state.packageModifiers = { ltvBoost: false, coBorrower: false, fixedRate: false };
+    if (app.amount != null) state.currentLimit = app.amount;
+    if (app.term != null) state.currentTerm = app.term;
+    if (app.rate != null) {
+        state.currentRate = app.rate;
+        state.baseRate = app.rate;
+    }
+    if (app.payment != null) state.currentPayment = app.payment;
+    if (app.offerValidUntil) state.offerValidUntil = app.offerValidUntil;
+
+    hideEl('view-choice');
+    hideEl('view-loading');
+    hideEl('view-manual-form');
+    showEl('view-result');
+
+    const sel = document.getElementById('packageSelectionBlock');
+    const done = document.getElementById('offerAcceptedBlock');
+    if (sel) sel.classList.add('hidden');
+    if (done) done.classList.remove('hidden');
+
+    if (typeof updateResultCards === 'function') updateResultCards();
+
+    const summary = document.getElementById('acceptedPackageSummary');
+    if (summary) {
+        const label = app.selectedPackageLabel || state.selectedPackageId || 'Выбранный пакет';
+        summary.innerHTML = 'Пакет: <b>' + label + '</b> · Ставка <b>' +
+            (app.rate != null ? Number(app.rate).toFixed(1) : '—') + '%</b> · ' +
+            'Платёж <b>~' + (app.payment != null ? app.payment.toLocaleString('ru-RU') : '—') + ' ₽</b>/мес · ' +
+            'Сумма <b>' + (app.amount != null ? app.amount.toLocaleString('ru-RU') : '—') + ' ₽</b>';
+    }
+
+    setStepState('st-1', 'done');
+    setStepState('st-2', 'done');
+    setStepState('st-3', 'done');
+    setStepState('st-4', 'done');
+    setStepState('st-5', 'done');
 }
 
 function ensureConveyorApplication() {
@@ -66,15 +147,27 @@ function ensureConveyorApplication() {
     if (!app || app.status === 'approved' || app.status === 'rejected') {
         const active = typeof getActiveClientApplications === 'function' ? getActiveClientApplications() : [];
         if (active[0]) return active[0].id;
-        const created = createNewClientApplication({ openConveyor: false, refresh: true });
-        return created ? created.id : appId;
+        if (typeof createNewClientApplication === 'function') {
+            const created = createNewClientApplication({ openConveyor: false, refresh: true });
+            return created ? created.id : appId;
+        }
+        return appId;
     }
     return app.id;
 }
 
 function openConveyorFromApplications() {
-    const appId = ensureConveyorApplication();
-    openConveyorForApp(appId);
+    try {
+        const appId = ensureConveyorApplication();
+        if (!appId) {
+            alert('Не удалось определить заявку для оформления');
+            return;
+        }
+        openConveyorForApp(appId);
+    } catch (err) {
+        console.error('openConveyorFromApplications failed', err);
+        alert('Не удалось открыть оформление заявки. Обновите страницу (Ctrl+F5) и попробуйте снова.');
+    }
 }
 
 function resetConveyor() {
@@ -85,12 +178,16 @@ function resetConveyor() {
     const done = document.getElementById('offerAcceptedBlock');
     if (sel) sel.classList.remove('hidden');
     if (done) done.classList.add('hidden');
-    ['view-result','view-loading','view-manual-form'].forEach(id => document.getElementById(id).classList.add('hidden'));
-    document.getElementById('view-choice').classList.remove('hidden');
-    document.getElementById('ocenkaPreview').classList.remove('visible');
-    document.getElementById('btnEsia').disabled = true;
-    document.getElementById('btnManual').disabled = true;
-    document.getElementById('collateralSelect').value = '';
+    ['view-result', 'view-loading', 'view-manual-form'].forEach(hideEl);
+    showEl('view-choice');
+    const preview = document.getElementById('ocenkaPreview');
+    if (preview) preview.classList.remove('visible');
+    const btnEsia = document.getElementById('btnEsia');
+    const btnManual = document.getElementById('btnManual');
+    const collateral = document.getElementById('collateralSelect');
+    if (btnEsia) btnEsia.disabled = true;
+    if (btnManual) btnManual.disabled = true;
+    if (collateral) collateral.value = '';
     setStepState('st-1', 'done');
     setStepState('st-2', 'active');
     setStepState('st-3', '');
@@ -189,9 +286,17 @@ function startFlow(type) {
 }
 
 function updateResultCards() {
-    document.getElementById('res-limit').textContent = state.currentLimit.toLocaleString('ru-RU') + ' ₽';
-    document.getElementById('res-rate').textContent = state.currentRate.toFixed(1) + '%';
-    document.getElementById('res-term').textContent = state.currentTerm + ' ' + getTermLabel(state.currentTerm);
-    document.getElementById('res-payment').textContent = '~ ' + state.currentPayment.toLocaleString('ru-RU') + ' ₽';
-    document.getElementById('ltv-label').textContent = 'до ' + Math.round(state.currentLTV * 100) + '% от оценки Ocenka.mobi';
+    const lim = document.getElementById('res-limit');
+    const rate = document.getElementById('res-rate');
+    const term = document.getElementById('res-term');
+    const pay = document.getElementById('res-payment');
+    const ltv = document.getElementById('ltv-label');
+    if (lim) lim.textContent = (state.currentLimit != null ? state.currentLimit : 0).toLocaleString('ru-RU') + ' ₽';
+    if (rate) rate.textContent = (state.currentRate != null ? Number(state.currentRate).toFixed(1) : '—') + '%';
+    if (term) {
+        const t = state.currentTerm != null ? state.currentTerm : 0;
+        term.textContent = t + ' ' + (typeof getTermLabel === 'function' ? getTermLabel(t) : 'лет');
+    }
+    if (pay) pay.textContent = '~ ' + (state.currentPayment != null ? state.currentPayment : 0).toLocaleString('ru-RU') + ' ₽';
+    if (ltv) ltv.textContent = 'до ' + Math.round((state.currentLTV || 0) * 100) + '% от оценки Ocenka.mobi';
 }

@@ -249,7 +249,8 @@ function updateApplicationStatus(appId, newStatus, statusLabel, historyText) {
     if (!app) return null;
     app.status = newStatus;
     app.statusLabel = statusLabel;
-    app.history.forEach(h => h.current = false);
+    if (!Array.isArray(app.history)) app.history = [];
+    app.history.forEach(h => { if (h) h.current = false; });
     app.history.unshift({
         text: historyText,
         date: new Date().toLocaleDateString('ru-RU') + ', ' + new Date().toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }),
