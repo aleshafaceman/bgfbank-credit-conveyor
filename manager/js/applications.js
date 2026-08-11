@@ -23,18 +23,28 @@ function renderApplicationList(filteredApps) {
     };
     
     container.innerHTML = apps.map(app => `
-        <div class="m-app-card ${app.id === selectedAppId ? 'active' : ''}" data-app-id="${app.id}" onclick="selectManagerApp('${app.id}')">
+        <div class="m-app-card ${app.id === selectedAppId ? 'active' : ''}" data-app-id="${app.id}">
             <div class="m-card-row">
                 <span class="m-card-id">№${app.id}</span>
-                <span class="m-card-date">${app.date}</span>
+                <span class="m-card-date">${app.date || ''}</span>
             </div>
-            <div class="m-card-client">${app.client}</div>
+            <div class="m-card-client">${app.client || ''}</div>
             <div class="m-card-bottom">
-                <span class="m-card-amount">${app.amount.toLocaleString('ru-RU')} ₽</span>
-                <span class="m-badge ${statusClasses[app.status] || 'badge-new'}">${app.statusLabel}</span>
+                <span class="m-card-amount">${(app.amount != null ? app.amount : 0).toLocaleString('ru-RU')} ₽</span>
+                <span class="m-badge ${statusClasses[app.status] || 'badge-processing'}">${app.statusLabel || app.status || ''}</span>
             </div>
         </div>
     `).join('');
+
+    if (!container._bgfClickBound) {
+        container._bgfClickBound = true;
+        container.addEventListener('click', function(e) {
+            var card = e.target.closest('.m-app-card');
+            if (!card) return;
+            var id = card.getAttribute('data-app-id');
+            if (id) selectManagerApp(id);
+        });
+    }
 }
 
 function filterApplications() {
@@ -44,9 +54,9 @@ function filterApplications() {
     let filtered = managerApplications;
     if (status !== 'all') filtered = filtered.filter(a => a.status === status);
     if (search) filtered = filtered.filter(a =>
-        a.id.toLowerCase().includes(search) ||
-        a.client.toLowerCase().includes(search) ||
-        a.collateralAddress.toLowerCase().includes(search)
+        (a.id || '').toLowerCase().includes(search) ||
+        (a.client || '').toLowerCase().includes(search) ||
+        (a.collateralAddress || '').toLowerCase().includes(search)
     );
     renderApplicationList(filtered);
 }
@@ -54,45 +64,62 @@ function filterApplications() {
 function selectManagerApp(appId) {
     refreshData();
     selectedAppId = appId;
+
+    var clientDetail = document.getElementById('mClientDetail');
+    var appDetail = document.getElementById('mAppDetail');
+    if (clientDetail) clientDetail.classList.add('hidden');
+    if (appDetail) appDetail.classList.remove('hidden');
+
     document.querySelectorAll('.m-app-card').forEach(c => {
-        c.classList.remove('active');
-        if (c.getAttribute('data-app-id') === appId) c.classList.add('active');
+        c.classList.toggle('active', c.getAttribute('data-app-id') === appId);
     });
-    closeClientCard();
+
+    renderApplicationDetail(appId);
 }
 
 function renderApplicationDetail(appId) {
     refreshData();
     const app = managerApplications.find(a => a.id === appId);
-    if (!app) return;
-    
     const container = document.getElementById('mAppDetail');
+    if (!container) return;
+
+    if (!app) {
+        container.innerHTML = '<div class="m-detail-empty"><i class="fas fa-file-alt"></i><p>Заявка №' + (appId || '') + ' не найдена</p></div>';
+        return;
+    }
+    
     const statusClasses = {
         new: 'badge-new', processing: 'badge-processing', valuation: 'badge-valuation',
         decision: 'badge-decision', approved: 'badge-approved', rejected: 'badge-rejected'
     };
     
-    const unreadCount = getUnreadCount(app.client);
+    const unreadCount = typeof getUnreadCount === 'function' ? getUnreadCount(app.client) : 0;
     const unreadBadge = unreadCount > 0
         ? `<span style="background:#ef4444;color:white;font-size:10px;padding:2px 6px;border-radius:8px;margin-left:6px;">${unreadCount}</span>`
         : '';
+
+    const docs = Array.isArray(app.documents) ? app.documents : [];
+    const history = Array.isArray(app.history) ? app.history : [];
+    const collateralValue = app.collateralValue != null ? app.collateralValue : 0;
+    const safeClient = (app.client || '').replace(/'/g, "\\'");
     
-    container.innerHTML = `
+    try {
+        container.innerHTML = `
         <div class="m-detail-header">
             <div>
                 <div class="m-detail-id">№${app.id}</div>
-                <div class="m-detail-product">${app.product}</div>
+                <div class="m-detail-product">${app.product || 'Кредит под залог недвижимости'}</div>
             </div>
-            <span class="m-badge ${statusClasses[app.status] || 'badge-new'}">${app.statusLabel}</span>
+            <span class="m-badge ${statusClasses[app.status] || 'badge-processing'}">${app.statusLabel || app.status || ''}</span>
         </div>
-        <div class="m-detail-client" style="cursor:pointer;color:#003b6f;" onclick="openClientCard('${app.client.replace(/'/g, "\\'")}')">
-            ${app.client} <i class="fas fa-external-link-alt" style="font-size:10px;opacity:0.5;"></i>
+        <div class="m-detail-client" style="cursor:pointer;color:#003b6f;" onclick="openClientCard('${safeClient}')">
+            ${app.client || '—'} <i class="fas fa-external-link-alt" style="font-size:10px;opacity:0.5;"></i>
         </div>
-        <div class="m-detail-phone"><i class="fas fa-phone" style="margin-right:4px;"></i> ${app.phone}</div>
+        <div class="m-detail-phone"><i class="fas fa-phone" style="margin-right:4px;"></i> ${app.phone || '—'}</div>
         
         <div class="m-detail-params" style="margin-top:20px;">
-            <div class="m-detail-param"><div class="m-param-label">Сумма кредита</div><div class="m-param-value">${app.amount.toLocaleString('ru-RU')} ₽</div></div>
-            <div class="m-detail-param"><div class="m-param-label">Срок</div><div class="m-param-value">${app.term} лет</div></div>
+            <div class="m-detail-param"><div class="m-param-label">Сумма кредита</div><div class="m-param-value">${(app.amount != null ? app.amount : 0).toLocaleString('ru-RU')} ₽</div></div>
+            <div class="m-detail-param"><div class="m-param-label">Срок</div><div class="m-param-value">${app.term || '—'} лет</div></div>
             <div class="m-detail-param"><div class="m-param-label">Ставка</div><div class="m-param-value ${app.rate ? '' : 'pending'}">${app.rate ? app.rate + '%' : 'ожидается'}</div></div>
             <div class="m-detail-param"><div class="m-param-label">Платёж / мес.</div><div class="m-param-value ${app.payment ? '' : 'pending'}">${app.payment ? '~ ' + app.payment.toLocaleString('ru-RU') + ' ₽' : 'ожидается'}</div></div>
             ${app.selectedPackageLabel ? '<div class="m-detail-param"><div class="m-param-label">Рекомендуемый пакет условий</div><div class="m-param-value">' + app.selectedPackageLabel + (app.offerValidUntil ? ' <span style="font-size:11px;color:#7e9bb6;">(до ' + app.offerValidUntil + ')</span>' : '') + '</div></div>' : ''}
@@ -100,47 +127,51 @@ function renderApplicationDetail(appId) {
         
         <div class="m-section">
             <h4><i class="fas fa-home"></i> Объект залога</h4>
-            <div class="m-detail-param"><div class="m-param-label">Адрес</div><div class="m-param-value" style="font-size:13px;">${app.collateralAddress}</div></div>
-            <div class="m-detail-param" style="margin-top:8px;"><div class="m-param-label">Оценка Ocenka.mobi</div><div class="m-param-value">${app.collateralValue.toLocaleString('ru-RU')} ₽</div></div>
+            <div class="m-detail-param"><div class="m-param-label">Адрес</div><div class="m-param-value" style="font-size:13px;">${app.collateralAddress || '—'}</div></div>
+            <div class="m-detail-param" style="margin-top:8px;"><div class="m-param-label">Оценка Ocenka.mobi</div><div class="m-param-value">${collateralValue.toLocaleString('ru-RU')} ₽</div></div>
         </div>
         
         <div class="m-section">
             <h4><i class="fas fa-file-alt"></i> Документы клиента</h4>
             <div class="m-doc-list">
-                ${app.documents.map(d => `
+                ${docs.length ? docs.map(d => `
                     <div class="m-doc-item">
                         <i class="fas ${d.status === 'uploaded' ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${d.status === 'uploaded' ? '#10b981' : '#ef4444'};"></i>
                         <span class="doc-name">${d.name}</span>
-                        <span class="doc-status ${d.status === 'uploaded' ? 'doc-uploaded' : 'doc-missing'}">${d.statusLabel}</span>
+                        <span class="doc-status ${d.status === 'uploaded' ? 'doc-uploaded' : 'doc-missing'}">${d.statusLabel || d.status || ''}</span>
                     </div>
-                `).join('')}
+                `).join('') : '<div style="color:#94a3b8;font-size:13px;">Документы не загружены</div>'}
             </div>
         </div>
         
         <div class="m-section">
             <h4><i class="fas fa-history"></i> История заявки</h4>
             <div class="m-history">
-                ${app.history.map(h => `
+                ${history.length ? history.map(h => `
                     <div class="m-history-item ${h.current ? 'current' : ''}">
                         <div style="font-weight:${h.current ? '600' : '400'};color:${h.current ? '#1e293b' : '#64748b'};">${h.text}</div>
-                        <div class="m-history-date">${h.date}</div>
+                        <div class="m-history-date">${h.date || ''}</div>
                     </div>
-                `).join('')}
+                `).join('') : '<div style="color:#94a3b8;font-size:13px;">История пуста</div>'}
             </div>
         </div>
         
-        ${renderDUSection(app)}
+        ${typeof renderDUSection === 'function' ? renderDUSection(app) : ''}
         
         <div class="m-actions">
             ${getActionButtons(app)}
-            <button class="m-btn m-btn-outline" onclick="switchManagerTab('clients'); setTimeout(function(){ openClientProfile('${app.client.replace(/'/g, "\\'")}'); }, 200);">
+            <button class="m-btn m-btn-outline" onclick="switchManagerTab('clients'); setTimeout(function(){ openClientProfile('${safeClient}'); }, 200);">
                 <i class="fas fa-user"></i> Профиль клиента
             </button>
-            <button class="m-btn m-btn-outline" onclick="switchManagerTab('chat'); openChatWithClient('${app.client.replace(/'/g, "\\'")}')">
+            <button class="m-btn m-btn-outline" onclick="switchManagerTab('chat'); openChatWithClient('${safeClient}')">
                 <i class="fas fa-comment-dots"></i> Чат ${unreadBadge}
             </button>
         </div>
     `;
+    } catch (err) {
+        console.error('renderApplicationDetail failed', appId, err);
+        container.innerHTML = '<div class="m-detail-empty"><p>Не удалось открыть заявку №' + appId + '</p><p style="font-size:12px;color:#94a3b8;">' + (err && err.message ? err.message : '') + '</p></div>';
+    }
 }
 
 function getActionButtons(app) {
@@ -164,7 +195,9 @@ function getActionButtons(app) {
             return `<button class="m-btn m-btn-outline" onclick="alert('Договор отправлен клиенту')"><i class="fas fa-signature"></i> Отправить договор</button>`;
         case 'rejected':
             return `<button class="m-btn m-btn-outline" onclick="alert('Клиент уведомлён')"><i class="fas fa-redo"></i> Предложить изменить параметры</button>`;
-        default: return '';
+        default:
+            return `<button class="m-btn m-btn-warning" onclick="managerAction('${app.id}','startScoring')"><i class="fas fa-robot"></i> Запустить прескоринг</button>
+                    <button class="m-btn m-btn-primary" onclick="openManagerScoring()"><i class="fas fa-flask"></i> Полный скоринг</button>`;
     }
 }
 

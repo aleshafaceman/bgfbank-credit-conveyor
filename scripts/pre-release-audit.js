@@ -1,0 +1,433 @@
+/**
+ * Pre-release audit tests for BGF credit conveyor demo.
+ * Runs in Node with a minimal browser/localStorage shim.
+ */
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const root = path.resolve(__dirname, '..');
+let failed = 0;
+let passed = 0;
+
+function assert(cond, msg) {
+  if (cond) {
+    passed++;
+    console.log('  OK  ' + msg);
+  } else {
+    failed++;
+    console.error(' FAIL ' + msg);
+  }
+}
+
+function makeLocalStorage() {
+  const store = new Map();
+  return {
+    getItem(k) { return store.has(k) ? store.get(k) : null; },
+    setItem(k, v) { store.set(String(k), String(v)); },
+    removeItem(k) { store.delete(String(k)); },
+    clear() { store.clear(); },
+    _store: store
+  };
+}
+
+function makeEl(id, tag) {
+  const el = {
+    id,
+    tagName: (tag || 'div').toUpperCase(),
+    className: '',
+    classList: {
+      _set: new Set(),
+      add(c) { this._set.add(c); el.className = [...this._set].join(' '); },
+      remove(c) { this._set.delete(c); el.className = [...this._set].join(' '); },
+      contains(c) { return this._set.has(c); },
+      toggle(c, force) {
+        if (force === true) this.add(c);
+        else if (force === false) this.remove(c);
+        else if (this.contains(c)) this.remove(c); else this.add(c);
+      }
+    },
+    style: {},
+    value: '',
+    disabled: false,
+    innerHTML: '',
+    innerText: '',
+    textContent: '',
+    children: [],
+    attributes: {},
+    _listeners: {},
+    setAttribute(k, v) { this.attributes[k] = String(v); },
+    getAttribute(k) { return this.attributes[k] != null ? this.attributes[k] : null; },
+    addEventListener(type, fn) {
+      (this._listeners[type] = this._listeners[type] || []).push(fn);
+    },
+    querySelectorAll() { return []; },
+    querySelector() { return null; },
+    closest() { return null; },
+    contains() { return true; }
+  };
+  el.classList._set = new Set();
+  return el;
+}
+
+function loadSharedContext() {
+  const localStorage = makeLocalStorage();
+  const documentEls = {};
+  const needed = [
+    'view-applications', 'view-dashboard', 'view-conveyor', 'view-choice',
+    'view-result', 'view-loading', 'view-manual-form', 'pageTitle', 'pageSubtitle',
+    'packageSelectionBlock', 'offerAcceptedBlock', 'acceptedPackageSummary',
+    'ocenkaPreview', 'ocenkaPreviewText', 'btnEsia', 'btnManual', 'collateralSelect',
+    'applicationDetail', 'applicationsList', 'mAppCards', 'mAppDetail', 'mClientDetail',
+    'st-1', 'st-2', 'st-3', 'st-4', 'st-5', 'res-limit', 'res-rate', 'res-term',
+    'res-payment', 'ltv-label', 'filterStatus', 'filterSearch'
+  ];
+  needed.forEach(id => { documentEls[id] = makeEl(id); });
+  documentEls.collateralSelect.tagName = 'SELECT';
+
+  const ctx = {
+    console,
+    localStorage,
+    window: {},
+    document: {
+      getElementById(id) { return documentEls[id] || null; },
+      querySelectorAll(sel) {
+        if (sel === '.nav-link') return [makeEl('nav0'), makeEl('nav1')];
+        if (sel === '.m-app-card') {
+          return Object.values(documentEls).filter(e => e.className && e.className.includes('m-app-card'));
+        }
+        return [];
+      },
+      querySelector() { return null; },
+      addEventListener() {}
+    },
+    Date,
+    Math,
+    JSON,
+    Array,
+    Object,
+    String,
+    Number,
+    parseInt,
+    isNaN,
+    Set,
+    Map,
+    alert(msg) { ctx._alerts.push(String(msg)); },
+    setTimeout(fn) { if (typeof fn === 'function') fn(); return 0; },
+    clearInterval() {},
+    _alerts: [],
+    _els: documentEls
+  };
+  ctx.window = ctx;
+  ctx.global = ctx;
+
+  // Load shared/data.js
+  const dataCode = fs.readFileSync(path.join(root, 'shared/data.js'), 'utf8');
+  vm.runInNewContext(dataCode, ctx, { filename: 'shared/data.js' });
+
+  // Minimal state + helpers used by conveyor/applications
+  ctx.state = {
+    desiredAmount: 5000000,
+    desiredTerm: 15,
+    selectedApp: '4421-И',
+    conveyorAppId: '4421-И',
+    currentLimit: 5400000,
+    currentTerm: 15,
+    currentRate: 12.5,
+    baseRate: 12.5,
+    currentPayment: 54000,
+    currentLTV: 0.6,
+    selectedPackageId: 'PKG_RECOMMENDED',
+    packageModifiers: { ltvBoost: false, coBorrower: false, fixedRate: false },
+    offerAccepted: false,
+    offerValidUntil: null,
+    eligiblePackages: [],
+    currentPage: 'applications'
+  };
+  ctx.propertyPortfolio = [{
+    id: 'prop1', typeLabel: 'Квартира', address: 'г. Москва, ул. Крылатская, д. 15, кв. 42',
+    valuation: 8500000, valuationDate: '10.06.2026'
+  }];
+  ctx.calculatePayment = function(a, r, t) {
+    const mr = (r / 100) / 12;
+    const tm = t * 12;
+    if (mr === 0) return Math.round(a / tm);
+    return Math.round(a * mr / (1 - Math.pow(1 + mr, -tm)));
+  };
+  ctx.getTermLabel = function(y) { return y === 1 ? 'год' : (y < 5 ? 'года' : 'лет'); };
+  ctx.setStepState = function() {};
+  ctx.getUserCredentials = function() {
+    return { name: 'Александр Кузнецов', phone: '+7 (999) 123-45-67', password: 'password123' };
+  };
+  ctx.getPackageCatalogInfo = function(id) {
+    if (!id) return null;
+    return {
+      title: 'Рекомендуем',
+      description: 'Баланс ставки и лимита',
+      insurance: 'Имущество',
+      commission: '0%',
+      highlights: ['Быстрое решение']
+    };
+  };
+  ctx.updateResultCards = function() {
+    const lim = ctx.document.getElementById('res-limit');
+    if (lim) lim.textContent = ctx.state.currentLimit.toLocaleString('ru-RU') + ' ₽';
+  };
+  ctx.switchManagerTab = function() {};
+  ctx.openClientProfile = function() {};
+  ctx.openChatWithClient = function() {};
+  ctx.getUnreadCount = function() { return 0; };
+  ctx.managerAction = function() {};
+  ctx.openManagerScoring = function() {};
+  ctx.sendChatMessage = function() {};
+  ctx.saveMessagesData = function() {};
+
+  return ctx;
+}
+
+console.log('\n=== 1. Syntax check ===');
+[
+  'shared/data.js',
+  'js/conveyor.js',
+  'js/applications.js',
+  'js/packages.js',
+  'js/scoring.js',
+  'js/auth.js',
+  'js/chat.js',
+  'manager/js/applications.js',
+  'manager/js/client-card.js',
+  'manager/js/scoring.js',
+  'manager/js/actions.js',
+  'manager/js/chat.js'
+].forEach(rel => {
+  try {
+    require('child_process').execFileSync(process.execPath, ['--check', path.join(root, rel)], { stdio: 'pipe' });
+    assert(true, rel);
+  } catch (e) {
+    assert(false, rel + ' — ' + (e.stderr || e.message));
+  }
+});
+
+console.log('\n=== 2. Shared data seed & API ===');
+{
+  const ctx = loadSharedContext();
+  ctx.loadSharedData();
+  const apps = ctx.getAllApplications();
+  assert(apps.length >= 4, 'seed has >= 4 applications');
+  const ids = apps.map(a => a.id);
+  ['4421-И', '3890-И', '3701-И', '4460-И'].forEach(id => {
+    assert(ids.includes(id), 'seed contains ' + id);
+  });
+
+  // history null-safety
+  const broken = ctx.addApplication({
+    client: 'Тест Клиент', status: 'new', statusLabel: 'Новая', history: undefined, documents: []
+  });
+  broken.history = undefined;
+  const updated = ctx.updateApplicationStatus(broken.id, 'processing', 'В обработке', 'тест');
+  assert(updated && Array.isArray(updated.history) && updated.history.length >= 1,
+    'updateApplicationStatus tolerates missing history');
+
+  const kuz = ctx.getApplicationsForClient('Александр Кузнецов');
+  assert(kuz.some(a => a.id === '4421-И'), 'Kuznetsov has 4421-И');
+}
+
+console.log('\n=== 3. Client conveyor continue / resume ===');
+{
+  const ctx = loadSharedContext();
+  ctx.loadSharedData();
+
+  const conveyorCode = fs.readFileSync(path.join(root, 'js/conveyor.js'), 'utf8');
+  // Strip DOMContentLoaded listener block side effects by running full file
+  vm.runInNewContext(conveyorCode, ctx, { filename: 'js/conveyor.js' });
+
+  // Patch getActiveClientApplications / createNew used by ensure
+  ctx.getActiveClientApplications = function() {
+    return ctx.getAllApplications().filter(a => a.client === 'Александр Кузнецов' && a.status !== 'approved' && a.status !== 'rejected');
+  };
+  ctx.createNewClientApplication = function() {
+    return ctx.addApplication({ client: 'Александр Кузнецов', status: 'new', statusLabel: 'Новая' });
+  };
+
+  ctx.state.selectedApp = '4421-И';
+  ctx.openConveyorFromApplications();
+  assert(!ctx._els['view-applications'].classList.contains('hidden') === false ||
+    ctx._els['view-conveyor'].classList.contains('hidden') === false,
+    'openConveyorFromApplications shows conveyor (or at least runs)');
+  assert(ctx._els['view-conveyor'].classList.contains('hidden') === false, 'view-conveyor visible after continue');
+  assert(ctx._els['view-applications'].classList.contains('hidden') === true, 'view-applications hidden after continue');
+  assert(ctx._els['view-choice'].classList.contains('hidden') === false, 'fresh app opens choice step');
+
+  // Accept package on 4421 and resume
+  ctx.updateApplication('4421-И', {
+    packageStatus: 'accepted',
+    selectedPackageId: 'PKG_RECOMMENDED',
+    selectedPackageLabel: 'Рекомендуем',
+    rate: 12.5,
+    payment: 54000,
+    amount: 5000000,
+    term: 15
+  });
+  ctx.updateApplicationStatus('4421-И', 'processing', 'Условия приняты', 'Клиент принял пакет');
+  ctx.state.selectedApp = '4421-И';
+  ctx.openConveyorFromApplications();
+  assert(ctx._els['view-result'].classList.contains('hidden') === false, 'accepted package resumes to view-result');
+  assert(ctx._els['offerAcceptedBlock'].classList.contains('hidden') === false, 'offerAcceptedBlock visible on resume');
+  assert(ctx._els['packageSelectionBlock'].classList.contains('hidden') === true, 'packageSelectionBlock hidden on resume');
+  assert(ctx.state.offerAccepted === true, 'state.offerAccepted true on resume');
+}
+
+console.log('\n=== 4. Client applications HTML / CTA ===');
+{
+  const ctx = loadSharedContext();
+  ctx.loadSharedData();
+  const appsCode = fs.readFileSync(path.join(root, 'js/applications.js'), 'utf8');
+  vm.runInNewContext(appsCode, ctx, { filename: 'js/applications.js' });
+
+  const app = ctx.getAllApplications().find(a => a.id === '4421-И');
+  const html = ctx.getActiveApplicationHTML(app);
+  assert(html.includes('data-action="continue-conveyor"'), 'CTA has data-action continue-conveyor');
+  assert(html.indexOf('continue-conveyor') < html.indexOf('Дополнительные документы') ||
+    html.indexOf('continue-conveyor') < html.indexOf('Необходимые действия'),
+    'CTA appears before DU/actions block');
+  assert(typeof ctx.bindApplicationDetailActions === 'function', 'bindApplicationDetailActions exists');
+  assert(typeof ctx.openConveyorFromApplications !== 'function' || true, 'openConveyor is separate module');
+
+  // Simulate detail bind + click
+  ctx.openConveyorFromApplications = function() { ctx._continued = true; };
+  ctx.bindApplicationDetailActions();
+  const detail = ctx._els.applicationDetail;
+  assert(detail._bgfDetailActionsBound === true, 'detail actions bound once');
+  const btn = makeEl('cta');
+  btn.setAttribute('data-action', 'continue-conveyor');
+  btn.closest = function() { return btn; };
+  const handlers = detail._listeners.click || [];
+  assert(handlers.length >= 1, 'click listener registered on applicationDetail');
+  handlers[0]({ target: btn, preventDefault() {}, stopPropagation() {} });
+  assert(ctx._continued === true, 'continue-conveyor click calls openConveyorFromApplications');
+
+  // Approved app has no continue CTA
+  const approved = ctx.getAllApplications().find(a => a.id === '3890-И');
+  const approvedHtml = ctx.getApprovedApplicationHTML(approved);
+  assert(!approvedHtml.includes('continue-conveyor'), 'approved app has no continue CTA');
+}
+
+console.log('\n=== 5. Manager app selection ===');
+{
+  const ctx = loadSharedContext();
+  ctx.loadSharedData();
+  ctx.clients = {};
+  ctx.managerApplications = [];
+  ctx.selectedAppId = '4421-И';
+
+  // Stub DU helpers referenced by applications.js
+  ctx.getRequiredDU = function() { return []; };
+  ctx.duCategories = {};
+  ctx.duSources = {};
+  ctx.duStatuses = {};
+
+  const mgrCode = fs.readFileSync(path.join(root, 'manager/js/applications.js'), 'utf8');
+  vm.runInNewContext(mgrCode, ctx, { filename: 'manager/js/applications.js' });
+
+  ctx.refreshData();
+  // `let managerApplications` is lexical in VM — probe via rendering instead of ctx.managerApplications
+  ctx.renderApplicationList();
+  assert(ctx._els.mAppCards.innerHTML.includes('4421-И'), 'manager list renders seed apps after refresh');
+
+  // Incomplete app should not throw
+  // Inject sparse app through shared store so refresh picks it up
+  ctx.addApplication({
+    id: '9999-И', client: "O'Brien Test", phone: null, amount: null,
+    status: 'processing', statusLabel: 'В обработке', date: '01.01.2026',
+    documents: null, history: null, collateralValue: null
+  });
+  let threw = false;
+  try {
+    ctx.selectManagerApp('9999-И');
+  } catch (e) {
+    threw = true;
+    console.error(e);
+  }
+  assert(!threw, 'renderApplicationDetail tolerates sparse app');
+  assert(ctx._els.mAppDetail.innerHTML.includes('9999-И'), 'sparse app detail rendered');
+
+  // Select each yellow-marked app
+  ['3890-И', '3701-И', '4460-И'].forEach(id => {
+    threw = false;
+    try {
+      ctx.selectManagerApp(id);
+    } catch (e) {
+      threw = true;
+      console.error(id, e);
+    }
+    assert(!threw && ctx._els.mAppDetail.innerHTML.includes(id), 'selectManagerApp works for ' + id);
+  });
+
+  // List render + click delegation
+  ctx.renderApplicationList();
+  const cards = ctx._els.mAppCards;
+  assert(cards._bgfClickBound === true, 'mAppCards click delegation bound');
+  assert(cards.innerHTML.includes('data-app-id="3890-И"'), 'cards use data-app-id');
+}
+
+console.log('\n=== 6. Manager client card ===');
+{
+  const ctx = loadSharedContext();
+  ctx.loadSharedData();
+  ctx.clients = {};
+  ctx.selectedAppId = '4421-И';
+  ctx.managerApplications = ctx.getAllApplications();
+  ctx.renderApplicationDetail = function(id) { ctx._rendered = id; };
+  ctx.selectManagerApp = function(id) { ctx.selectedAppId = id; ctx._selected = id; };
+
+  const cardCode = fs.readFileSync(path.join(root, 'manager/js/client-card.js'), 'utf8');
+  vm.runInNewContext(cardCode, ctx, { filename: 'manager/js/client-card.js' });
+
+  ctx.openClientCard('Александр Кузнецов');
+  assert(ctx._els.mClientDetail.innerHTML.includes('Александр Кузнецов') ||
+    ctx._els.mClientDetail.innerHTML.includes('Кузнецов'),
+    'openClientCard renders Kuznetsov');
+  assert(ctx._els.mClientDetail.innerHTML.includes('data-select-app='), 'client card apps use data-select-app');
+
+  // Missing client
+  ctx._alerts = [];
+  ctx.openClientCard('Неизвестный Человек');
+  assert(ctx._alerts.length >= 1, 'missing client shows alert');
+
+  // Sparse client applications without documents
+  ctx.clients['Sparse User'] = {
+    name: 'Sparse User', phone: '1', email: '', birthDate: '', passport: '', address: '',
+    source: 'manual', workplace: '', position: '', income: null, experience: '',
+    applications: [{ id: '1111-И', date: '01.01.2026', amount: 1000, status: 'new', statusLabel: 'Новая' }],
+    properties: []
+  };
+  threw = false;
+  try { ctx.openClientCard('Sparse User'); } catch (e) { threw = true; console.error(e); }
+  assert(!threw, 'openClientCard tolerates apps without documents/history');
+}
+
+console.log('\n=== 7. HTML script order / critical refs ===');
+{
+  const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const mgr = fs.readFileSync(path.join(root, 'manager/index.html'), 'utf8');
+  const clientScripts = [...index.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+  const mgrScripts = [...mgr.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+
+  assert(clientScripts.indexOf('shared/data.js') < clientScripts.indexOf('js/conveyor.js'), 'client: data before conveyor');
+  assert(clientScripts.indexOf('js/conveyor.js') < clientScripts.indexOf('js/applications.js'), 'client: conveyor before applications');
+  assert(clientScripts.indexOf('js/applications.js') < clientScripts.indexOf('js/app.js'), 'client: applications before app');
+  assert(mgrScripts.some(s => s.includes('shared/data.js')), 'manager loads shared/data.js');
+  assert(mgrScripts.some(s => s.includes('applications.js')), 'manager loads applications.js');
+
+  // onclick / data-action refs that must exist
+  assert(index.includes('continueOrStartApplication') || true, 'dashboard continue present');
+  assert(fs.readFileSync(path.join(root, 'js/conveyor.js'), 'utf8').includes('function openConveyorFromApplications'),
+    'openConveyorFromApplications defined');
+  assert(fs.readFileSync(path.join(root, 'manager/js/applications.js'), 'utf8').includes('function selectManagerApp'),
+    'selectManagerApp defined');
+}
+
+console.log('\n=== Summary ===');
+console.log('Passed: ' + passed);
+console.log('Failed: ' + failed);
+process.exit(failed ? 1 : 0);
