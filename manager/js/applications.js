@@ -95,7 +95,7 @@ function renderApplicationDetail(appId) {
             <div class="m-detail-param"><div class="m-param-label">Срок</div><div class="m-param-value">${app.term} лет</div></div>
             <div class="m-detail-param"><div class="m-param-label">Ставка</div><div class="m-param-value ${app.rate ? '' : 'pending'}">${app.rate ? app.rate + '%' : 'ожидается'}</div></div>
             <div class="m-detail-param"><div class="m-param-label">Платёж / мес.</div><div class="m-param-value ${app.payment ? '' : 'pending'}">${app.payment ? '~ ' + app.payment.toLocaleString('ru-RU') + ' ₽' : 'ожидается'}</div></div>
-            ${app.selectedPackageLabel ? '<div class="m-detail-param"><div class="m-param-label">РекомендуемыйПакет условий</div><div class="m-param-value">' + app.selectedPackageLabel + (app.offerValidUntil ? ' <span style="font-size:11px;color:#7e9bb6;">(до ' + app.offerValidUntil + ')</span>' : '') + '</div></div>' : ''}
+            ${app.selectedPackageLabel ? '<div class="m-detail-param"><div class="m-param-label">Рекомендуемый пакет условий</div><div class="m-param-value">' + app.selectedPackageLabel + (app.offerValidUntil ? ' <span style="font-size:11px;color:#7e9bb6;">(до ' + app.offerValidUntil + ')</span>' : '') + '</div></div>' : ''}
         </div>
         
         <div class="m-section">
@@ -153,7 +153,9 @@ function getActionButtons(app) {
                     <button class="m-btn m-btn-primary" onclick="openManagerScoring()"><i class="fas fa-flask"></i> Полный скоринг</button>
                     <button class="m-btn m-btn-outline" onclick="managerAction('${app.id}','requestDocs')"><i class="fas fa-file-upload"></i> Запросить документы</button>`;
         case 'valuation':
-            return `<button class="m-btn m-btn-warning" onclick="managerAction('${app.id}','requestValuation')"><i class="fas fa-home"></i> Запросить оценку</button>
+            return `<button class="m-btn m-btn-warning" onclick="managerAction('${app.id}','startScoring')"><i class="fas fa-robot"></i> Запустить прескоринг</button>
+                    <button class="m-btn m-btn-primary" onclick="openManagerScoring()"><i class="fas fa-flask"></i> Полный скоринг</button>
+                    <button class="m-btn m-btn-outline" onclick="managerAction('${app.id}','requestValuation')"><i class="fas fa-home"></i> Запросить оценку</button>
                     <button class="m-btn m-btn-outline" onclick="managerAction('${app.id}','requestDocs')"><i class="fas fa-file-upload"></i> Запросить документы</button>`;
         case 'decision':
             return `<button class="m-btn m-btn-success" onclick="managerAction('${app.id}','approve')"><i class="fas fa-check"></i> Одобрить</button>

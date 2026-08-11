@@ -42,6 +42,7 @@ function onCollateralSelect(v) {
 }
 
 function openConveyorFromApplications() {
+    state.conveyorAppId = state.selectedApp || state.conveyorAppId || '4421-И';
     document.getElementById('view-applications').classList.add('hidden');
     document.getElementById('view-conveyor').classList.remove('hidden');
     populateCollateralSelect();
@@ -95,17 +96,25 @@ function goBackToChoice() {
     document.getElementById('view-choice').classList.remove('hidden');
 }
 
-function toggleConsent(cbId, itemId) {
+function syncConsent(cbId, itemId) {
     const cb = document.getElementById(cbId);
-    cb.checked = !cb.checked;
-    document.getElementById(itemId).classList.toggle('checked', cb.checked);
+    if (!cb) return;
+    const item = document.getElementById(itemId);
+    if (item) item.classList.toggle('checked', cb.checked);
     checkConsents();
 }
 
+/** @deprecated kept for any leftover callers; prefer checkbox onchange → syncConsent */
+function toggleConsent(cbId, itemId) {
+    syncConsent(cbId, itemId);
+}
+
 function checkConsents() {
-    const pd = document.getElementById('consentPersonalData').checked;
-    const bki = document.getElementById('consentBKI').checked;
-    document.getElementById('btnSubmitManual').disabled = !(pd && bki);
+    const pd = document.getElementById('consentPersonalData');
+    const bki = document.getElementById('consentBKI');
+    const btn = document.getElementById('btnSubmitManual');
+    if (!pd || !bki || !btn) return;
+    btn.disabled = !(pd.checked && bki.checked);
 }
 
 function submitManualForm() {

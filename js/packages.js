@@ -338,15 +338,17 @@ function acceptOfferPackage() {
             packageCommission: catalog ? catalog.commission : (pkg.commission || ''),
             offerValidUntil: state.offerValidUntil
         });
-        if (typeof renderApplicationDetail === 'function' && state.selectedApp === activeId) {
-            renderApplicationDetail(activeId);
-        }
         updateApplicationStatus(
             activeId,
             'processing',
             'Условия приняты',
             'Клиент принял пакет «' + pkg.title + '»: ставка ' + state.currentRate + '%, платёж ~' + state.currentPayment.toLocaleString('ru-RU') + ' ₽'
         );
+        if (typeof refreshClientApplicationsUI === 'function') {
+            refreshClientApplicationsUI(activeId);
+        } else if (typeof renderApplicationDetail === 'function') {
+            renderApplicationDetail(activeId);
+        }
     }
 
     if (typeof sendChatMessage === 'function') {

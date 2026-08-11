@@ -58,8 +58,10 @@ let propertyPortfolio = [
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 document.addEventListener('DOMContentLoaded', function() {
-    // Скрываем сайдбар до входа
-    document.getElementById('appSidebar').style.display = 'none';
+    const shell = document.getElementById('appShell');
+    if (shell) shell.classList.remove('app-logged-in', 'sidebar-open');
+    const sidebar = document.getElementById('appSidebar');
+    if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
     
     // Заполняем выпадающий список объектов
     populateCollateralSelect();
@@ -71,6 +73,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('authPassword').value = user.password;
     }
     
-    // Показываем выбранную заявку
-    selectApplication('4421-И');
+    // Показываем заявки из общей базы
+    if (typeof loadSharedData === 'function') loadSharedData();
+    if (typeof renderApplicationsList === 'function') renderApplicationsList();
+    const preferred = (typeof getClientApplications === 'function' && getClientApplications().some(a => a.id === '4421-И'))
+        ? '4421-И'
+        : (typeof getClientApplications === 'function' && getClientApplications()[0] && getClientApplications()[0].id);
+    if (preferred) selectApplication(preferred);
 });

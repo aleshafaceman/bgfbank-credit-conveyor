@@ -239,9 +239,8 @@ function runPrescoring() {
             updateProgress();
             
             setTimeout(function() {
-                var outcomes = ['approved', 'approved', 'declined', 'review'];
-                var outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
-                showResult(outcome);
+                // Позитивный демо-сценарий: итог всегда «прескоринг пройден»
+                showResult('approved');
             }, 500);
             return;
         }
